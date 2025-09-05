@@ -3,6 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Edit, Trash2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 
 interface FAQItem {
@@ -60,6 +65,13 @@ const getLanguageBadge = (language: FAQItem['language']) => {
 const FAQ = () => {
   const [faqs, setFaqs] = useState<FAQItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [newFAQ, setNewFAQ] = useState({
+    question: '',
+    answer: '',
+    language: 'English' as FAQItem['language'],
+    category: ''
+  });
 
   useEffect(() => {
     const fetchFAQs = async () => {
@@ -140,6 +152,53 @@ const FAQ = () => {
 
     fetchFAQs();
   }, []);
+
+  const handleAddFAQ = async () => {
+    if (!newFAQ.question.trim() || !newFAQ.answer.trim()) {
+      return; // Don't submit if required fields are empty
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('faq')
+        .insert([{
+          question: newFAQ.question,
+          answer: newFAQ.answer,
+          language: newFAQ.language === 'Polish' ? 'pl' : 'en',
+          category: newFAQ.category || null,
+          is_published: true,
+          author_id: 1 // Using admin user ID for now
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Add the new FAQ to local state
+      const formattedFAQ: FAQItem = {
+        id: data.id,
+        question: data.question,
+        answer: data.answer,
+        language: (data.language === 'pl' ? 'Polish' : 'English') as FAQItem['language'],
+        category: data.category
+      };
+
+      setFaqs(prevFaqs => [formattedFAQ, ...prevFaqs]);
+
+      // Reset form and close dialog
+      setNewFAQ({
+        question: '',
+        answer: '',
+        language: 'English',
+        category: ''
+      });
+      setIsAddDialogOpen(false);
+
+      console.log('FAQ added successfully');
+    } catch (error) {
+      console.error('Error adding FAQ:', error);
+    }
+  };
   if (isLoading) {
     return (
       <div className="p-6">
@@ -158,10 +217,85 @@ const FAQ = () => {
           <h1 className="text-3xl font-bold text-primary">FAQ Management</h1>
           <p className="text-muted-foreground">Manage frequently asked questions for your clients</p>
         </div>
-        <Button className="bg-gradient-primary hover:opacity-90">
-          <Plus className="w-4 h-4 mr-2" />
-          Add FAQ
-        </Button>
+        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="bg-gradient-primary hover:opacity-90">
+              <Plus className="w-4 h-4 mr-2" />
+              Add FAQ
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Add New FAQ</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="question">Question *</Label>
+                <Input
+                  id="question"
+                  placeholder="Enter the frequently asked question..."
+                  value={newFAQ.question}
+                  onChange={(e) => setNewFAQ(prev => ({ ...prev, question: e.target.value }))}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="answer">Answer *</Label>
+                <Textarea
+                  id="answer"
+                  placeholder="Enter the answer to the question..."
+                  value={newFAQ.answer}
+                  onChange={(e) => setNewFAQ(prev => ({ ...prev, answer: e.target.value }))}
+                  rows={4}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="language">Language</Label>
+                  <Select 
+                    value={newFAQ.language} 
+                    onValueChange={(value: FAQItem['language']) => setNewFAQ(prev => ({ ...prev, language: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select language" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="English">English</SelectItem>
+                      <SelectItem value="Polish">Polish</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="category">Category (Optional)</Label>
+                  <Input
+                    id="category"
+                    placeholder="e.g., Processing Times, Requirements"
+                    value={newFAQ.category}
+                    onChange={(e) => setNewFAQ(prev => ({ ...prev, category: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsAddDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleAddFAQ}
+                  disabled={!newFAQ.question.trim() || !newFAQ.answer.trim()}
+                  className="bg-gradient-primary hover:opacity-90"
+                >
+                  Add FAQ
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* FAQ Table */}
