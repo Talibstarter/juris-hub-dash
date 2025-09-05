@@ -42,6 +42,7 @@ const ClientQuestions = () => {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
 
   useEffect(() => {
     const fetchQuestions = async () => {
@@ -160,12 +161,48 @@ const ClientQuestions = () => {
       // Clear the answer input
       setAnswer('');
       
+      // Clear any saved draft
+      const draftKey = `draft_${selectedQuestion.id}`;
+      localStorage.removeItem(draftKey);
+      
       alert('Response sent successfully!');
     } catch (error) {
       console.error('Unexpected error:', error);
       alert(`Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    if (!selectedQuestion || !answer.trim()) {
+      alert('Please enter some content to save as draft');
+      return;
+    }
+
+    setIsSavingDraft(true);
+    try {
+      console.log('Saving draft for question:', selectedQuestion.id);
+      
+      // Save draft to localStorage for now (in a real app, this could be saved to database)
+      const draftKey = `draft_${selectedQuestion.id}`;
+      localStorage.setItem(draftKey, answer.trim());
+
+      console.log('Draft saved successfully');
+      alert('Draft saved successfully!');
+    } catch (error) {
+      console.error('Error saving draft:', error);
+      alert('Error saving draft. Please try again.');
+    } finally {
+      setIsSavingDraft(false);
+    }
+  };
+
+  const loadDraft = (questionId: number) => {
+    const draftKey = `draft_${questionId}`;
+    const savedDraft = localStorage.getItem(draftKey);
+    if (savedDraft) {
+      setAnswer(savedDraft);
     }
   };
 
@@ -248,8 +285,12 @@ const ClientQuestions = () => {
                   <Send className="w-4 h-4 mr-2" />
                   {isSubmitting ? 'Sending...' : 'Send Response'}
                 </Button>
-                <Button variant="outline">
-                  Save Draft
+                <Button 
+                  variant="outline"
+                  onClick={handleSaveDraft}
+                  disabled={!answer.trim() || isSavingDraft}
+                >
+                  {isSavingDraft ? 'Saving...' : 'Save Draft'}
                 </Button>
               </div>
             </CardContent>
@@ -363,7 +404,10 @@ const ClientQuestions = () => {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => setSelectedQuestion(question)}
+                          onClick={() => {
+                            setSelectedQuestion(question);
+                            loadDraft(question.id);
+                          }}
                         >
                           <MessageSquare className="w-4 h-4 mr-2" />
                           {question.status === 'answered' ? 'View' : 'Answer'}
