@@ -159,6 +159,45 @@ const DocumentChecklist = () => {
     }
   };
 
+  const handleDeleteDocument = async (docId: number | string, docName: string) => {
+    if (!confirm(`Are you sure you want to delete "${docName}" from the document checklist? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      console.log('Deleting document requirement:', docId);
+      
+      // Extract process ID from document ID (format: "processId-index")
+      const processId = typeof docId === 'string' ? parseInt(docId.split('-')[0]) : docId;
+      
+      const { error } = await supabase
+        .from('processes')
+        .delete()
+        .eq('id', processId);
+
+      if (error) {
+        console.error('Database error:', error);
+        alert(`Error deleting document: ${error.message}`);
+        return;
+      }
+
+      console.log('Document requirement deleted successfully');
+
+      // Remove document from local state
+      setDocuments(prevDocs => prevDocs.filter(doc => doc.id !== docId));
+
+      alert('Document requirement deleted successfully!');
+    } catch (error) {
+      console.error('Unexpected error:', error);
+      alert(`Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleEditDocument = (doc: Document) => {
+    // Placeholder for edit functionality
+    alert(`Edit functionality for "${doc.name}" will be implemented soon!`);
+  };
+
   const requiredDocs = documents.filter(doc => doc.required);
   const optionalDocs = documents.filter(doc => !doc.required);
 
@@ -345,10 +384,19 @@ const DocumentChecklist = () => {
                       </td>
                       <td className="p-4">
                         <div className="flex items-center space-x-2">
-                          <Button size="sm" variant="outline">
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleEditDocument(doc)}
+                          >
                             <Edit className="w-4 h-4" />
                           </Button>
-                          <Button size="sm" variant="outline" className="text-destructive hover:text-destructive">
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => handleDeleteDocument(doc.id, doc.name)}
+                          >
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
@@ -401,10 +449,19 @@ const DocumentChecklist = () => {
                       </td>
                       <td className="p-4">
                         <div className="flex items-center space-x-2">
-                          <Button size="sm" variant="outline">
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleEditDocument(doc)}
+                          >
                             <Edit className="w-4 h-4" />
                           </Button>
-                          <Button size="sm" variant="outline" className="text-destructive hover:text-destructive">
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => handleDeleteDocument(doc.id, doc.name)}
+                          >
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
