@@ -123,21 +123,70 @@ const SubmittedDocuments = () => {
     fetchDocuments();
   }, []);
 
-  const handleApprove = (doc: SubmittedDocument) => {
-    // Placeholder for approval logic
-    console.log('Approved document:', doc);
+  const handleApprove = async (doc: SubmittedDocument) => {
+    try {
+      // Update document status in database
+      const { error } = await supabase
+        .from('user_documents')
+        .update({ 
+          status: 'approved',
+          reviewed_at: new Date().toISOString(),
+          reviewer_id: 1 // Using admin user ID for now
+        })
+        .eq('id', doc.id);
+
+      if (error) throw error;
+
+      // Update local state to reflect the change
+      setDocuments(prevDocs => 
+        prevDocs.map(d => 
+          d.id === doc.id 
+            ? { ...d, status: 'approved' as const }
+            : d
+        )
+      );
+
+      console.log('Document approved successfully:', doc.documentName);
+    } catch (error) {
+      console.error('Error approving document:', error);
+    }
   };
 
   const handleReject = (doc: SubmittedDocument) => {
     setRejectDialog(doc);
   };
 
-  const confirmReject = () => {
+  const confirmReject = async () => {
     if (rejectDialog && rejectionReason.trim()) {
-      // Placeholder for rejection logic
-      console.log('Rejected document:', rejectDialog, 'Reason:', rejectionReason);
-      setRejectDialog(null);
-      setRejectionReason('');
+      try {
+        // Update document status in database
+        const { error } = await supabase
+          .from('user_documents')
+          .update({ 
+            status: 'rejected',
+            comments: rejectionReason,
+            reviewed_at: new Date().toISOString(),
+            reviewer_id: 1 // Using admin user ID for now
+          })
+          .eq('id', rejectDialog.id);
+
+        if (error) throw error;
+
+        // Update local state to reflect the change
+        setDocuments(prevDocs => 
+          prevDocs.map(d => 
+            d.id === rejectDialog.id 
+              ? { ...d, status: 'rejected' as const, notes: rejectionReason }
+              : d
+          )
+        );
+
+        console.log('Document rejected successfully:', rejectDialog.documentName);
+        setRejectDialog(null);
+        setRejectionReason('');
+      } catch (error) {
+        console.error('Error rejecting document:', error);
+      }
     }
   };
 
