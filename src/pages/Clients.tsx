@@ -2,7 +2,11 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Eye } from 'lucide-react';
+import { Eye, Plus, Trash2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 
 interface Client {
@@ -43,6 +47,14 @@ const Clients = () => {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [newClient, setNewClient] = useState({
+    first_name: '',
+    last_name: '',
+    email: '',
+    phone: '',
+    role: 'client' as 'client' | 'lawyer',
+  });
 
   useEffect(() => {
     const fetchClients = async () => {
@@ -91,6 +103,98 @@ const Clients = () => {
 
     fetchClients();
   }, []);
+
+  const handleAddClient = async () => {
+    if (!newClient.first_name.trim() || !newClient.last_name.trim() || !newClient.email.trim()) {
+      alert('Please fill in first name, last name, and email fields');
+      return;
+    }
+
+    try {
+      console.log('Adding new client:', newClient);
+      
+      const { data, error } = await supabase
+        .from('users')
+        .insert([{
+          first_name: newClient.first_name.trim(),
+          last_name: newClient.last_name.trim(),
+          email: newClient.email.trim(),
+          role: newClient.role,
+          telegram_id: Math.floor(Math.random() * 1000000000), // Generate random telegram_id
+          preferred_lang: 'en',
+          is_active: true
+        }])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Database error:', error);
+        alert(`Error adding client: ${error.message}`);
+        return;
+      }
+
+      console.log('Client added successfully:', data);
+
+      // Add the new client to local state
+      const formattedClient: Client = {
+        id: data.id,
+        name: `${data.first_name} ${data.last_name}`,
+        caseStatus: 'pending',
+        email: data.email,
+        phone: 'Not provided',
+        lastActivity: new Date().toISOString().split('T')[0],
+        role: data.role
+      };
+
+      setClients(prevClients => [formattedClient, ...prevClients]);
+
+      // Reset form and close dialog
+      setNewClient({
+        first_name: '',
+        last_name: '',
+        email: '',
+        phone: '',
+        role: 'client'
+      });
+      setIsAddDialogOpen(false);
+
+      alert('Client added successfully!');
+    } catch (error) {
+      console.error('Unexpected error:', error);
+      alert(`Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleDeleteClient = async (clientId: number, clientName: string) => {
+    if (!confirm(`Are you sure you want to delete client "${clientName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      console.log('Deleting client:', clientId);
+      
+      const { error } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', clientId);
+
+      if (error) {
+        console.error('Database error:', error);
+        alert(`Error deleting client: ${error.message}`);
+        return;
+      }
+
+      console.log('Client deleted successfully');
+
+      // Remove client from local state
+      setClients(prevClients => prevClients.filter(client => client.id !== clientId));
+
+      alert('Client deleted successfully!');
+    } catch (error) {
+      console.error('Unexpected error:', error);
+      alert(`Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
 
   if (selectedClient) {
     return (
@@ -201,9 +305,101 @@ const Clients = () => {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-primary">Clients</h1>
-        <p className="text-muted-foreground">Manage your client cases and information</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-primary">Clients</h1>
+          <p className="text-muted-foreground">Manage your client cases and information</p>
+        </div>
+        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="bg-gradient-primary hover:opacity-90">
+              <Plus className="w-4 h-4 mr-2" />
+              Add Client
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Add New Client</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="first_name">First Name *</Label>
+                  <Input
+                    id="first_name"
+                    placeholder="Enter first name..."
+                    value={newClient.first_name}
+                    onChange={(e) => setNewClient(prev => ({ ...prev, first_name: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="last_name">Last Name *</Label>
+                  <Input
+                    id="last_name"
+                    placeholder="Enter last name..."
+                    value={newClient.last_name}
+                    onChange={(e) => setNewClient(prev => ({ ...prev, last_name: e.target.value }))}
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <Label htmlFor="email">Email *</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="Enter email address..."
+                  value={newClient.email}
+                  onChange={(e) => setNewClient(prev => ({ ...prev, email: e.target.value }))}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="phone">Phone (Optional)</Label>
+                  <Input
+                    id="phone"
+                    placeholder="Enter phone number..."
+                    value={newClient.phone}
+                    onChange={(e) => setNewClient(prev => ({ ...prev, phone: e.target.value }))}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="role">Role</Label>
+                  <Select 
+                    value={newClient.role} 
+                    onValueChange={(value: 'client' | 'lawyer') => setNewClient(prev => ({ ...prev, role: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="client">Client</SelectItem>
+                      <SelectItem value="lawyer">Lawyer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsAddDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleAddClient}
+                  disabled={!newClient.first_name.trim() || !newClient.last_name.trim() || !newClient.email.trim()}
+                  className="bg-gradient-primary hover:opacity-90"
+                >
+                  Add Client
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Clients Table */}
@@ -244,14 +440,25 @@ const Clients = () => {
                       </td>
                       <td className="p-4 text-muted-foreground">{client.lastActivity}</td>
                       <td className="p-4">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setSelectedClient(client)}
-                        >
-                          <Eye className="w-4 h-4 mr-2" />
-                          View
-                        </Button>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setSelectedClient(client)}
+                          >
+                            <Eye className="w-4 h-4 mr-2" />
+                            View
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => handleDeleteClient(client.id, client.name)}
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))
