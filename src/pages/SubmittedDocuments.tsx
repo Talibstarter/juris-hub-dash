@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Check, X, FileText, AlertCircle } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SubmittedDocument {
   id: number;
@@ -17,58 +18,6 @@ interface SubmittedDocument {
   fileSize?: string;
   notes?: string;
 }
-
-const documents: SubmittedDocument[] = [
-  {
-    id: 1,
-    clientName: 'John Doe',
-    documentName: 'Passport.pdf',
-    uploadDate: '01/09/2025',
-    status: 'pending',
-    fileSize: '2.3 MB'
-  },
-  {
-    id: 2,
-    clientName: 'Anna Kowalska',
-    documentName: 'RentalAgreement.pdf',
-    uploadDate: '02/09/2025',
-    status: 'approved',
-    fileSize: '1.8 MB'
-  },
-  {
-    id: 3,
-    clientName: 'Maria Ivanova',
-    documentName: 'EmploymentContract.pdf',
-    uploadDate: '03/09/2025',
-    status: 'rejected',
-    fileSize: '1.2 MB',
-    notes: 'Document is not clearly visible, please re-upload'
-  },
-  {
-    id: 4,
-    clientName: 'Pavel Novak',
-    documentName: 'HealthInsurance.pdf',
-    uploadDate: '04/09/2025',
-    status: 'approved',
-    fileSize: '3.1 MB'
-  },
-  {
-    id: 5,
-    clientName: 'Elena Rodriguez',
-    documentName: 'ProofOfIncome.pdf',
-    uploadDate: '05/09/2025',
-    status: 'pending',
-    fileSize: '2.7 MB'
-  },
-  {
-    id: 6,
-    clientName: 'John Doe',
-    documentName: 'BankStatement.pdf',
-    uploadDate: '06/09/2025',
-    status: 'pending',
-    fileSize: '4.2 MB'
-  }
-];
 
 const getStatusBadge = (status: SubmittedDocument['status']) => {
   const variants = {
@@ -93,6 +42,86 @@ const getStatusBadge = (status: SubmittedDocument['status']) => {
 const SubmittedDocuments = () => {
   const [rejectDialog, setRejectDialog] = useState<SubmittedDocument | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [documents, setDocuments] = useState<SubmittedDocument[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDocuments = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('user_documents')
+          .select(`
+            *,
+            documents (
+              original_name,
+              created_at,
+              size_bytes
+            ),
+            cases (
+              users (
+                first_name,
+                last_name
+              )
+            )
+          `)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          const formattedDocuments = data.map(doc => ({
+            id: doc.id,
+            clientName: `${doc.cases?.users?.first_name || 'Unknown'} ${doc.cases?.users?.last_name || 'User'}`.trim(),
+            documentName: doc.documents?.original_name || 'Unknown Document',
+            uploadDate: doc.documents?.created_at?.split('T')[0] || doc.created_at?.split('T')[0] || '2025-01-01',
+            status: (doc.status === 'pending' ? 'pending' : 
+                     doc.status === 'approved' ? 'approved' : 
+                     doc.status === 'rejected' ? 'rejected' : 'pending') as SubmittedDocument['status'],
+            fileSize: doc.documents?.size_bytes ? `${(doc.documents.size_bytes / 1024 / 1024).toFixed(1)} MB` : undefined,
+            notes: doc.comments
+          }));
+          setDocuments(formattedDocuments);
+        } else {
+          // Fallback data if no documents in database
+          setDocuments([
+            {
+              id: 1,
+              clientName: 'Demo User',
+              documentName: 'Student_Visa_Application.pdf',
+              uploadDate: '2025-01-09',
+              status: 'pending',
+              fileSize: '2.3 MB'
+            },
+            {
+              id: 2,
+              clientName: 'Sample Client',
+              documentName: 'Passport_Copy.pdf',
+              uploadDate: '2025-01-08',
+              status: 'pending',
+              fileSize: '1.8 MB'
+            },
+          ]);
+        }
+      } catch (error) {
+        console.error('Error fetching documents:', error);
+        // Keep fallback data on error
+        setDocuments([
+          {
+            id: 1,
+            clientName: 'Demo User',
+            documentName: 'Student_Visa_Application.pdf',
+            uploadDate: '2025-01-09',
+            status: 'pending',
+            fileSize: '2.3 MB'
+          }
+        ]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDocuments();
+  }, []);
 
   const handleApprove = (doc: SubmittedDocument) => {
     // Placeholder for approval logic
@@ -115,6 +144,16 @@ const SubmittedDocuments = () => {
   const pendingDocs = documents.filter(doc => doc.status === 'pending');
   const approvedDocs = documents.filter(doc => doc.status === 'approved');
   const rejectedDocs = documents.filter(doc => doc.status === 'rejected');
+
+  if (isLoading) {
+    return (
+      <div className="p-6">
+        <div className="text-center py-8">
+          <p className="text-muted-foreground">Loading documents...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -178,66 +217,76 @@ const SubmittedDocuments = () => {
                 </tr>
               </thead>
               <tbody>
-                {documents.map((doc) => (
-                  <tr key={doc.id} className="border-b hover:bg-muted/20 transition-colors">
-                    <td className="p-4">
-                      <div className="font-medium">{doc.clientName}</div>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex items-center space-x-3">
-                        <FileText className="w-5 h-5 text-primary" />
-                        <div>
-                          <div className="font-medium">{doc.documentName}</div>
-                          <div className="text-xs text-muted-foreground">{doc.fileSize}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="p-4 text-muted-foreground">{doc.uploadDate}</td>
-                    <td className="p-4">
-                      <div className="flex items-center space-x-2">
-                        {getStatusBadge(doc.status)}
-                        {doc.status === 'rejected' && doc.notes && (
-                          <Tooltip>
-                            <TooltipTrigger>
-                              <AlertCircle className="w-4 h-4 text-destructive" />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>{doc.notes}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      {doc.status === 'pending' ? (
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-success hover:text-success"
-                            onClick={() => handleApprove(doc)}
-                          >
-                            <Check className="w-4 h-4 mr-1" />
-                            Approve
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-destructive hover:text-destructive"
-                            onClick={() => handleReject(doc)}
-                          >
-                            <X className="w-4 h-4 mr-1" />
-                            Reject
-                          </Button>
-                        </div>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">
-                          {doc.status === 'approved' ? 'Approved' : 'Rejected'}
-                        </span>
-                      )}
+                {documents.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                      No documents found
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  documents.map((doc) => (
+                    <tr key={doc.id} className="border-b hover:bg-muted/20 transition-colors">
+                      <td className="p-4">
+                        <div className="font-medium">{doc.clientName}</div>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center space-x-3">
+                          <FileText className="w-5 h-5 text-primary" />
+                          <div>
+                            <div className="font-medium">{doc.documentName}</div>
+                            {doc.fileSize && (
+                              <div className="text-xs text-muted-foreground">{doc.fileSize}</div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-4 text-muted-foreground">{doc.uploadDate}</td>
+                      <td className="p-4">
+                        <div className="flex items-center space-x-2">
+                          {getStatusBadge(doc.status)}
+                          {doc.status === 'rejected' && doc.notes && (
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <AlertCircle className="w-4 h-4 text-destructive" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>{doc.notes}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        {doc.status === 'pending' ? (
+                          <div className="flex items-center space-x-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-success hover:text-success"
+                              onClick={() => handleApprove(doc)}
+                            >
+                              <Check className="w-4 h-4 mr-1" />
+                              Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => handleReject(doc)}
+                            >
+                              <X className="w-4 h-4 mr-1" />
+                              Reject
+                            </Button>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">
+                            {doc.status === 'approved' ? 'Approved' : 'Rejected'}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

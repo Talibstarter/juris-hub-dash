@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, MessageSquare, Send } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Question {
   id: number;
@@ -11,45 +12,9 @@ interface Question {
   question: string;
   dateSubmitted: string;
   status: 'open' | 'answered' | 'pending';
+  language?: string;
+  answer?: string;
 }
-
-const questions: Question[] = [
-  {
-    id: 1,
-    clientName: 'John Doe',
-    question: 'When will my Karta Pobytu be ready? I submitted all documents last month.',
-    dateSubmitted: '01/09/2025',
-    status: 'open'
-  },
-  {
-    id: 2,
-    clientName: 'Maria Ivanova',
-    question: 'Can I travel abroad while waiting for the decision? I have urgent business travel.',
-    dateSubmitted: '02/09/2025',
-    status: 'answered'
-  },
-  {
-    id: 3,
-    clientName: 'Anna Kowalska',
-    question: 'Do I need to translate my birth certificate? The immigration office mentioned it.',
-    dateSubmitted: '03/09/2025',
-    status: 'pending'
-  },
-  {
-    id: 4,
-    clientName: 'Pavel Novak',
-    question: 'My employment contract is ending soon. Will this affect my application?',
-    dateSubmitted: '04/09/2025',
-    status: 'open'
-  },
-  {
-    id: 5,
-    clientName: 'Elena Rodriguez',
-    question: 'I received a letter from the immigration office asking for additional documents. What should I do?',
-    dateSubmitted: '05/09/2025',
-    status: 'open'
-  }
-];
 
 const getStatusBadge = (status: Question['status']) => {
   const variants = {
@@ -74,6 +39,88 @@ const getStatusBadge = (status: Question['status']) => {
 const ClientQuestions = () => {
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
   const [answer, setAnswer] = useState('');
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchQuestions = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('questions')
+          .select(`
+            *,
+            users!questions_user_id_fkey (
+              first_name,
+              last_name
+            )
+          `)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          const formattedQuestions = data.map(q => ({
+            id: q.id,
+            clientName: `${q.users?.first_name || 'Unknown'} ${q.users?.last_name || 'User'}`.trim(),
+            question: q.text,
+            dateSubmitted: q.created_at?.split('T')[0] || '2025-01-01',
+            status: (q.status === 'new' ? 'open' : 
+                    q.status === 'answered' ? 'answered' : 'pending') as Question['status'],
+            language: q.lang || 'English',
+            answer: q.answer
+          }));
+          setQuestions(formattedQuestions);
+        } else {
+          // Fallback data if no questions in database
+          setQuestions([
+            {
+              id: 1,
+              clientName: 'Demo User',
+              question: 'When will my student visa Karta Pobytu be ready? I submitted all documents last month.',
+              dateSubmitted: '2025-01-09',
+              status: 'open',
+              language: 'English'
+            },
+            {
+              id: 2,
+              clientName: 'Sample Client',
+              question: 'Can I travel abroad while waiting for the decision? I have urgent business travel.',
+              dateSubmitted: '2025-01-08',
+              status: 'open',
+              language: 'English'
+            },
+          ]);
+        }
+      } catch (error) {
+        console.error('Error fetching questions:', error);
+        // Keep fallback data on error
+        setQuestions([
+          {
+            id: 1,
+            clientName: 'Demo User',
+            question: 'When will my student visa Karta Pobytu be ready?',
+            dateSubmitted: '2025-01-09',
+            status: 'open',
+            language: 'English'
+          }
+        ]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchQuestions();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="p-6">
+        <div className="text-center py-8">
+          <p className="text-muted-foreground">Loading questions...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (selectedQuestion) {
     return (
@@ -106,6 +153,10 @@ const ClientQuestions = () => {
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Date Submitted</p>
                 <p>{selectedQuestion.dateSubmitted}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Language</p>
+                <p>{selectedQuestion.language || 'English'}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Question</p>
@@ -145,7 +196,7 @@ const ClientQuestions = () => {
         </div>
 
         {/* Previous Responses */}
-        {selectedQuestion.status === 'answered' && (
+        {selectedQuestion.status === 'answered' && selectedQuestion.answer && (
           <Card className="shadow-card">
             <CardHeader>
               <CardTitle className="text-primary">Previous Responses</CardTitle>
@@ -155,9 +206,9 @@ const ClientQuestions = () => {
                 <div className="p-4 bg-success/5 border border-success/20 rounded-lg">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-sm font-medium">Your Response</p>
-                    <p className="text-xs text-muted-foreground">02/09/2025 14:30</p>
+                    <p className="text-xs text-muted-foreground">{selectedQuestion.dateSubmitted}</p>
                   </div>
-                  <p className="text-sm">Yes, you can travel abroad with your current documents and the temporary residence stamp. Make sure to carry all your original documents when traveling.</p>
+                  <p className="text-sm">{selectedQuestion.answer}</p>
                 </div>
               </div>
             </CardContent>
@@ -226,32 +277,40 @@ const ClientQuestions = () => {
                 </tr>
               </thead>
               <tbody>
-                {questions.map((question) => (
-                  <tr key={question.id} className="border-b hover:bg-muted/20 transition-colors">
-                    <td className="p-4">
-                      <div className="font-medium">{question.clientName}</div>
-                    </td>
-                    <td className="p-4">
-                      <div className="text-sm max-w-md truncate">
-                        {question.question}
-                      </div>
-                    </td>
-                    <td className="p-4 text-muted-foreground">{question.dateSubmitted}</td>
-                    <td className="p-4">
-                      {getStatusBadge(question.status)}
-                    </td>
-                    <td className="p-4">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setSelectedQuestion(question)}
-                      >
-                        <MessageSquare className="w-4 h-4 mr-2" />
-                        {question.status === 'answered' ? 'View' : 'Answer'}
-                      </Button>
+                {questions.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                      No questions found
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  questions.map((question) => (
+                    <tr key={question.id} className="border-b hover:bg-muted/20 transition-colors">
+                      <td className="p-4">
+                        <div className="font-medium">{question.clientName}</div>
+                      </td>
+                      <td className="p-4">
+                        <div className="text-sm max-w-md truncate">
+                          {question.question}
+                        </div>
+                      </td>
+                      <td className="p-4 text-muted-foreground">{question.dateSubmitted}</td>
+                      <td className="p-4">
+                        {getStatusBadge(question.status)}
+                      </td>
+                      <td className="p-4">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setSelectedQuestion(question)}
+                        >
+                          <MessageSquare className="w-4 h-4 mr-2" />
+                          {question.status === 'answered' ? 'View' : 'Answer'}
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

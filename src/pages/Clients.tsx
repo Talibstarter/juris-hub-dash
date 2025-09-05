@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Eye } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Client {
   id: number;
@@ -11,42 +12,10 @@ interface Client {
   email: string;
   phone: string;
   lastActivity: string;
+  case_id?: string;
+  role?: string;
+  telegram_id?: number;
 }
-
-const clients: Client[] = [
-  {
-    id: 1,
-    name: 'John Doe',
-    caseStatus: 'in-progress',
-    email: 'john.doe@email.com',
-    phone: '+48 123 456 789',
-    lastActivity: '2 days ago'
-  },
-  {
-    id: 2,
-    name: 'Anna Kowalska',
-    caseStatus: 'pending',
-    email: 'anna.kowalska@email.com',
-    phone: '+48 987 654 321',
-    lastActivity: '1 day ago'
-  },
-  {
-    id: 3,
-    name: 'Maria Ivanova',
-    caseStatus: 'approved',
-    email: 'maria.ivanova@email.com',
-    phone: '+48 555 777 999',
-    lastActivity: '5 days ago'
-  },
-  {
-    id: 4,
-    name: 'Pavel Novak',
-    caseStatus: 'in-progress',
-    email: 'pavel.novak@email.com',
-    phone: '+48 333 222 111',
-    lastActivity: '3 hours ago'
-  }
-];
 
 const getStatusBadge = (status: Client['caseStatus']) => {
   const variants = {
@@ -72,6 +41,56 @@ const getStatusBadge = (status: Client['caseStatus']) => {
 
 const Clients = () => {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchClients = async () => {
+      try {
+        const { data: users, error } = await supabase
+          .from('users')
+          .select(`
+            *,
+            cases (
+              id,
+              status,
+              category,
+              public_case_id,
+              created_at,
+              updated_at
+            )
+          `)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        const formattedClients = users?.map(user => ({
+          id: user.id,
+          name: `${user.first_name || 'Unknown'} ${user.last_name || 'User'}`.trim(),
+          caseStatus: (user.cases?.[0]?.status === 'new' ? 'pending' : 
+                     user.cases?.[0]?.status === 'in_review' ? 'in-progress' :
+                     user.cases?.[0]?.status === 'approved' ? 'approved' :
+                     user.cases?.[0]?.status === 'rejected' ? 'rejected' : 'pending') as Client['caseStatus'],
+          email: user.email || 'No email provided',
+          phone: 'Not provided',
+          lastActivity: user.cases?.[0]?.updated_at?.split('T')[0] || user.created_at?.split('T')[0] || '2025-01-01',
+          case_id: user.cases?.[0]?.public_case_id,
+          role: user.role,
+          telegram_id: user.telegram_id
+        })) || [];
+
+        setClients(formattedClients);
+      } catch (error) {
+        console.error('Error fetching clients:', error);
+        // Fallback to empty array on error
+        setClients([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchClients();
+  }, []);
 
   if (selectedClient) {
     return (
@@ -123,8 +142,12 @@ const Clients = () => {
                 <p>March 15, 2025</p>
               </div>
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Case Type</p>
-                <p>Karta Pobytu Application</p>
+                <p className="text-sm font-medium text-muted-foreground">Case ID</p>
+                <p>{selectedClient.case_id || 'No case assigned'}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">User Role</p>
+                <p className="capitalize">{selectedClient.role || 'Client'}</p>
               </div>
             </CardContent>
           </Card>
@@ -165,6 +188,16 @@ const Clients = () => {
     );
   }
 
+  if (isLoading) {
+    return (
+      <div className="p-6">
+        <div className="text-center py-8">
+          <p className="text-muted-foreground">Loading clients...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -188,33 +221,41 @@ const Clients = () => {
                 </tr>
               </thead>
               <tbody>
-                {clients.map((client) => (
-                  <tr key={client.id} className="border-b hover:bg-muted/20 transition-colors">
-                    <td className="p-4">
-                      <div className="font-medium">{client.name}</div>
-                    </td>
-                    <td className="p-4">
-                      {getStatusBadge(client.caseStatus)}
-                    </td>
-                    <td className="p-4">
-                      <div className="space-y-1">
-                        <div className="text-sm">{client.email}</div>
-                        <div className="text-sm text-muted-foreground">{client.phone}</div>
-                      </div>
-                    </td>
-                    <td className="p-4 text-muted-foreground">{client.lastActivity}</td>
-                    <td className="p-4">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setSelectedClient(client)}
-                      >
-                        <Eye className="w-4 h-4 mr-2" />
-                        View
-                      </Button>
+                {clients.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                      No clients found
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  clients.map((client) => (
+                    <tr key={client.id} className="border-b hover:bg-muted/20 transition-colors">
+                      <td className="p-4">
+                        <div className="font-medium">{client.name}</div>
+                      </td>
+                      <td className="p-4">
+                        {getStatusBadge(client.caseStatus)}
+                      </td>
+                      <td className="p-4">
+                        <div className="space-y-1">
+                          <div className="text-sm">{client.email}</div>
+                          <div className="text-sm text-muted-foreground">{client.phone}</div>
+                        </div>
+                      </td>
+                      <td className="p-4 text-muted-foreground">{client.lastActivity}</td>
+                      <td className="p-4">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setSelectedClient(client)}
+                        >
+                          <Eye className="w-4 h-4 mr-2" />
+                          View
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
