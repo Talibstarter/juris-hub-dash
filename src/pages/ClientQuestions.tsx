@@ -41,6 +41,7 @@ const ClientQuestions = () => {
   const [answer, setAnswer] = useState('');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const fetchQuestions = async () => {
@@ -111,6 +112,62 @@ const ClientQuestions = () => {
 
     fetchQuestions();
   }, []);
+
+  const handleSendResponse = async () => {
+    if (!selectedQuestion || !answer.trim()) {
+      alert('Please enter a response');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      console.log('Sending response for question:', selectedQuestion.id);
+      
+      const { error } = await supabase
+        .from('questions')
+        .update({
+          answer: answer.trim(),
+          status: 'answered',
+          answered_at: new Date().toISOString(),
+          answered_by: 1 // This would be the current user's ID in a real app
+        })
+        .eq('id', selectedQuestion.id);
+
+      if (error) {
+        console.error('Database error:', error);
+        alert(`Error sending response: ${error.message}`);
+        return;
+      }
+
+      console.log('Response sent successfully');
+
+      // Update local state
+      setQuestions(prevQuestions => 
+        prevQuestions.map(q => 
+          q.id === selectedQuestion.id 
+            ? { ...q, status: 'answered' as const, answer: answer.trim() }
+            : q
+        )
+      );
+
+      // Update selected question
+      setSelectedQuestion({
+        ...selectedQuestion,
+        status: 'answered',
+        answer: answer.trim()
+      });
+
+      // Clear the answer input
+      setAnswer('');
+      
+      alert('Response sent successfully!');
+    } catch (error) {
+      console.error('Unexpected error:', error);
+      alert(`Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -183,9 +240,13 @@ const ClientQuestions = () => {
                 />
               </div>
               <div className="flex items-center space-x-2">
-                <Button className="bg-gradient-primary hover:opacity-90">
+                <Button 
+                  className="bg-gradient-primary hover:opacity-90"
+                  onClick={handleSendResponse}
+                  disabled={!answer.trim() || isSubmitting}
+                >
                   <Send className="w-4 h-4 mr-2" />
-                  Send Response
+                  {isSubmitting ? 'Sending...' : 'Send Response'}
                 </Button>
                 <Button variant="outline">
                   Save Draft
