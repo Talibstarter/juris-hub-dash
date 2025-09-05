@@ -41,7 +41,15 @@ const DocumentChecklist = () => {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingDocument, setEditingDocument] = useState<Document | null>(null);
   const [newDocument, setNewDocument] = useState({
+    name: '',
+    category: 'Identity' as Document['category'],
+    required: true,
+    description: ''
+  });
+  const [editDocument, setEditDocument] = useState({
     name: '',
     category: 'Identity' as Document['category'],
     required: true,
@@ -194,8 +202,76 @@ const DocumentChecklist = () => {
   };
 
   const handleEditDocument = (doc: Document) => {
-    // Placeholder for edit functionality
-    alert(`Edit functionality for "${doc.name}" will be implemented soon!`);
+    setEditingDocument(doc);
+    setEditDocument({
+      name: doc.name,
+      category: doc.category,
+      required: doc.required,
+      description: doc.description || ''
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleUpdateDocument = async () => {
+    if (!editingDocument || !editDocument.name.trim()) {
+      alert('Please enter a document name');
+      return;
+    }
+
+    try {
+      console.log('Updating document requirement:', editingDocument.id);
+      
+      // Extract process ID from document ID (format: "processId-index")
+      const processId = typeof editingDocument.id === 'string' ? parseInt(editingDocument.id.split('-')[0]) : editingDocument.id;
+      
+      const { data, error } = await supabase
+        .from('processes')
+        .update({
+          name: `${editDocument.name} Process`,
+          description: editDocument.description || `Process for ${editDocument.name}`,
+          required_documents: [editDocument.name]
+        })
+        .eq('id', processId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Database error:', error);
+        alert(`Error updating document: ${error.message}`);
+        return;
+      }
+
+      console.log('Document requirement updated successfully:', data);
+
+      // Update the document in local state
+      setDocuments(prevDocs => prevDocs.map(doc => 
+        doc.id === editingDocument.id 
+          ? {
+              ...doc,
+              name: editDocument.name,
+              category: editDocument.category,
+              required: editDocument.required,
+              description: editDocument.description || `Required for: ${data.name}`,
+              process_name: data.name
+            }
+          : doc
+      ));
+
+      // Reset form and close dialog
+      setEditDocument({
+        name: '',
+        category: 'Identity',
+        required: true,
+        description: ''
+      });
+      setEditingDocument(null);
+      setIsEditDialogOpen(false);
+
+      alert('Document requirement updated successfully!');
+    } catch (error) {
+      console.error('Unexpected error:', error);
+      alert(`Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   };
 
   const requiredDocs = documents.filter(doc => doc.required);
@@ -297,6 +373,85 @@ const DocumentChecklist = () => {
                   className="bg-gradient-primary hover:opacity-90"
                 >
                   Add Document
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Document Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Edit Document Requirement</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="edit_document_name">Document Name *</Label>
+                <Input
+                  id="edit_document_name"
+                  placeholder="e.g., Birth Certificate, Bank Statement..."
+                  value={editDocument.name}
+                  onChange={(e) => setEditDocument(prev => ({ ...prev, name: e.target.value }))}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="edit_description">Description</Label>
+                <Textarea
+                  id="edit_description"
+                  placeholder="Describe what this document is for and any specific requirements..."
+                  value={editDocument.description}
+                  onChange={(e) => setEditDocument(prev => ({ ...prev, description: e.target.value }))}
+                  rows={3}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit_category">Category</Label>
+                  <Select 
+                    value={editDocument.category} 
+                    onValueChange={(value: Document['category']) => setEditDocument(prev => ({ ...prev, category: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Identity">Identity</SelectItem>
+                      <SelectItem value="Work">Work</SelectItem>
+                      <SelectItem value="Housing">Housing</SelectItem>
+                      <SelectItem value="Financial">Financial</SelectItem>
+                      <SelectItem value="Education">Education</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center space-x-2 pt-6">
+                  <Checkbox
+                    id="edit_required"
+                    checked={editDocument.required}
+                    onCheckedChange={(checked) => setEditDocument(prev => ({ ...prev, required: !!checked }))}
+                  />
+                  <Label htmlFor="edit_required" className="text-sm font-medium">
+                    Required document
+                  </Label>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsEditDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleUpdateDocument}
+                  disabled={!editDocument.name.trim()}
+                  className="bg-gradient-primary hover:opacity-90"
+                >
+                  Update Document
                 </Button>
               </div>
             </div>
