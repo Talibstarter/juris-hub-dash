@@ -155,24 +155,33 @@ const FAQ = () => {
 
   const handleAddFAQ = async () => {
     if (!newFAQ.question.trim() || !newFAQ.answer.trim()) {
-      return; // Don't submit if required fields are empty
+      alert('Please fill in both question and answer fields');
+      return;
     }
 
     try {
+      console.log('Attempting to add FAQ:', newFAQ);
+      
       const { data, error } = await supabase
         .from('faq')
         .insert([{
-          question: newFAQ.question,
-          answer: newFAQ.answer,
+          question: newFAQ.question.trim(),
+          answer: newFAQ.answer.trim(),
           language: newFAQ.language === 'Polish' ? 'pl' : 'en',
-          category: newFAQ.category || null,
+          category: newFAQ.category.trim() || null,
           is_published: true,
-          author_id: 1 // Using admin user ID for now
+          author_id: null // Allow null since this field might be optional
         }])
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database error:', error);
+        alert(`Error adding FAQ: ${error.message}`);
+        return;
+      }
+
+      console.log('FAQ added successfully:', data);
 
       // Add the new FAQ to local state
       const formattedFAQ: FAQItem = {
@@ -194,9 +203,10 @@ const FAQ = () => {
       });
       setIsAddDialogOpen(false);
 
-      console.log('FAQ added successfully');
+      alert('FAQ added successfully!');
     } catch (error) {
-      console.error('Error adding FAQ:', error);
+      console.error('Unexpected error:', error);
+      alert(`Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
   if (isLoading) {
