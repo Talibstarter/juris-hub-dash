@@ -3,6 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Edit, Trash2, FileText } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 
 interface Document {
@@ -34,6 +40,13 @@ const getCategoryBadge = (category: Document['category']) => {
 const DocumentChecklist = () => {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [newDocument, setNewDocument] = useState({
+    name: '',
+    category: 'Identity' as Document['category'],
+    required: true,
+    description: ''
+  });
 
   useEffect(() => {
     const fetchDocuments = async () => {
@@ -88,6 +101,64 @@ const DocumentChecklist = () => {
     fetchDocuments();
   }, []);
 
+  const handleAddDocument = async () => {
+    if (!newDocument.name.trim()) {
+      alert('Please enter a document name');
+      return;
+    }
+
+    try {
+      console.log('Adding new document requirement:', newDocument);
+      
+      // Create a new process entry with this document requirement
+      const { data, error } = await supabase
+        .from('processes')
+        .insert([{
+          name: `${newDocument.name} Process`,
+          description: newDocument.description || `Process for ${newDocument.name}`,
+          required_documents: [newDocument.name],
+          estimated_duration_days: 30,
+          is_active: true
+        }])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Database error:', error);
+        alert(`Error adding document: ${error.message}`);
+        return;
+      }
+
+      console.log('Document requirement added successfully:', data);
+
+      // Add the new document to local state
+      const formattedDocument: Document = {
+        id: `${data.id}-0`,
+        name: newDocument.name,
+        category: newDocument.category,
+        required: newDocument.required,
+        description: newDocument.description || `Required for: ${data.name}`,
+        process_name: data.name
+      };
+
+      setDocuments(prevDocs => [formattedDocument, ...prevDocs]);
+
+      // Reset form and close dialog
+      setNewDocument({
+        name: '',
+        category: 'Identity',
+        required: true,
+        description: ''
+      });
+      setIsAddDialogOpen(false);
+
+      alert('Document requirement added successfully!');
+    } catch (error) {
+      console.error('Unexpected error:', error);
+      alert(`Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
   const requiredDocs = documents.filter(doc => doc.required);
   const optionalDocs = documents.filter(doc => !doc.required);
 
@@ -109,10 +180,89 @@ const DocumentChecklist = () => {
           <h1 className="text-3xl font-bold text-primary">Document Checklist</h1>
           <p className="text-muted-foreground">Manage required documents for Karta Pobytu applications</p>
         </div>
-        <Button className="bg-gradient-primary hover:opacity-90">
-          <Plus className="w-4 h-4 mr-2" />
-          Add Document
-        </Button>
+        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="bg-gradient-primary hover:opacity-90">
+              <Plus className="w-4 h-4 mr-2" />
+              Add Document
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Add New Document Requirement</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="document_name">Document Name *</Label>
+                <Input
+                  id="document_name"
+                  placeholder="e.g., Birth Certificate, Bank Statement..."
+                  value={newDocument.name}
+                  onChange={(e) => setNewDocument(prev => ({ ...prev, name: e.target.value }))}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  placeholder="Describe what this document is for and any specific requirements..."
+                  value={newDocument.description}
+                  onChange={(e) => setNewDocument(prev => ({ ...prev, description: e.target.value }))}
+                  rows={3}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="category">Category</Label>
+                  <Select 
+                    value={newDocument.category} 
+                    onValueChange={(value: Document['category']) => setNewDocument(prev => ({ ...prev, category: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Identity">Identity</SelectItem>
+                      <SelectItem value="Work">Work</SelectItem>
+                      <SelectItem value="Housing">Housing</SelectItem>
+                      <SelectItem value="Financial">Financial</SelectItem>
+                      <SelectItem value="Education">Education</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center space-x-2 pt-6">
+                  <Checkbox
+                    id="required"
+                    checked={newDocument.required}
+                    onCheckedChange={(checked) => setNewDocument(prev => ({ ...prev, required: !!checked }))}
+                  />
+                  <Label htmlFor="required" className="text-sm font-medium">
+                    Required document
+                  </Label>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsAddDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleAddDocument}
+                  disabled={!newDocument.name.trim()}
+                  className="bg-gradient-primary hover:opacity-90"
+                >
+                  Add Document
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Statistics */}
