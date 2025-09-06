@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Check, X, FileText, AlertCircle } from 'lucide-react';
+import { Check, X, FileText, AlertCircle, ExternalLink } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface SubmittedDocument {
@@ -190,6 +190,18 @@ const SubmittedDocuments = () => {
     }
   };
 
+  const handleOpenFile = (doc: SubmittedDocument) => {
+    // For demo purposes, open a placeholder PDF in a new tab
+    // In a real implementation, this would fetch the actual file URL from Supabase storage
+    const fileUrl = `data:application/pdf;base64,JVBERi0xLjQKJdPr6eEKMSAwIG9iago8PAovVGl0bGUgKCR7ZG9jLmRvY3VtZW50TmFtZX0pCi9Dcmv=`;
+    
+    // Create a temporary URL for demonstration
+    const demoUrl = `https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf`;
+    
+    // Open file in new tab
+    window.open(demoUrl, '_blank', 'noopener,noreferrer');
+  };
+
   const pendingDocs = documents.filter(doc => doc.status === 'pending');
   const approvedDocs = documents.filter(doc => doc.status === 'approved');
   const rejectedDocs = documents.filter(doc => doc.status === 'rejected');
@@ -279,14 +291,19 @@ const SubmittedDocuments = () => {
                         <div className="font-medium">{doc.clientName}</div>
                       </td>
                       <td className="p-4">
-                        <div className="flex items-center space-x-3">
+                        <div 
+                          className="flex items-center space-x-3 cursor-pointer hover:bg-muted/10 rounded-md p-2 -m-2 transition-colors group"
+                          onClick={() => handleOpenFile(doc)}
+                          title="Click to open file in new tab"
+                        >
                           <FileText className="w-5 h-5 text-primary" />
-                          <div>
+                          <div className="flex-1">
                             <div className="font-medium">{doc.documentName}</div>
                             {doc.fileSize && (
                               <div className="text-xs text-muted-foreground">{doc.fileSize}</div>
                             )}
                           </div>
+                          <ExternalLink className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
                         </div>
                       </td>
                       <td className="p-4 text-muted-foreground">{doc.uploadDate}</td>
