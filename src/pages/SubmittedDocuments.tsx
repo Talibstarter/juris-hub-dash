@@ -68,53 +68,22 @@ const SubmittedDocuments = () => {
 
         if (error) throw error;
 
-        if (data && data.length > 0) {
-          const formattedDocuments = data.map(doc => ({
-            id: doc.id,
-            clientName: `${doc.cases?.users?.first_name || 'Unknown'} ${doc.cases?.users?.last_name || 'User'}`.trim(),
-            documentName: doc.documents?.original_name || 'Unknown Document',
-            uploadDate: doc.documents?.created_at?.split('T')[0] || doc.created_at?.split('T')[0] || '2025-01-01',
-            status: (doc.status === 'pending' ? 'pending' : 
-                     doc.status === 'approved' ? 'approved' : 
-                     doc.status === 'rejected' ? 'rejected' : 'pending') as SubmittedDocument['status'],
-            fileSize: doc.documents?.size_bytes ? `${(doc.documents.size_bytes / 1024 / 1024).toFixed(1)} MB` : undefined,
-            notes: doc.comments
-          }));
-          setDocuments(formattedDocuments);
-        } else {
-          // Fallback data if no documents in database
-          setDocuments([
-            {
-              id: 1,
-              clientName: 'Demo User',
-              documentName: 'Student_Visa_Application.pdf',
-              uploadDate: '2025-01-09',
-              status: 'pending',
-              fileSize: '2.3 MB'
-            },
-            {
-              id: 2,
-              clientName: 'Sample Client',
-              documentName: 'Passport_Copy.pdf',
-              uploadDate: '2025-01-08',
-              status: 'pending',
-              fileSize: '1.8 MB'
-            },
-          ]);
-        }
+        const formattedDocuments = data ? data.map(doc => ({
+          id: doc.id,
+          clientName: `${doc.cases?.users?.first_name || 'Unknown'} ${doc.cases?.users?.last_name || 'User'}`.trim(),
+          documentName: doc.documents?.original_name || 'Unknown Document',
+          uploadDate: doc.documents?.created_at?.split('T')[0] || doc.created_at?.split('T')[0] || '2025-01-01',
+          status: (doc.status === 'pending' ? 'pending' : 
+                   doc.status === 'approved' ? 'approved' : 
+                   doc.status === 'rejected' ? 'rejected' : 'pending') as SubmittedDocument['status'],
+          fileSize: doc.documents?.size_bytes ? `${(doc.documents.size_bytes / 1024 / 1024).toFixed(1)} MB` : undefined,
+          notes: doc.comments
+        })) : [];
+        
+        setDocuments(formattedDocuments);
       } catch (error) {
         console.error('Error fetching documents:', error);
-        // Keep fallback data on error
-        setDocuments([
-          {
-            id: 1,
-            clientName: 'Demo User',
-            documentName: 'Student_Visa_Application.pdf',
-            uploadDate: '2025-01-09',
-            status: 'pending',
-            fileSize: '2.3 MB'
-          }
-        ]);
+        setDocuments([]);
       } finally {
         setIsLoading(false);
       }
@@ -281,7 +250,13 @@ const SubmittedDocuments = () => {
                 {documents.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="p-8 text-center text-muted-foreground">
-                      No documents found
+                      <div className="flex flex-col items-center space-y-3">
+                        <FileText className="w-12 h-12 text-muted-foreground/50" />
+                        <div>
+                          <p className="font-medium">No documents submitted yet</p>
+                          <p className="text-sm">Documents uploaded by users will appear here for review</p>
+                        </div>
+                      </div>
                     </td>
                   </tr>
                 ) : (

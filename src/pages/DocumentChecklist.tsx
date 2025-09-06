@@ -67,40 +67,21 @@ const DocumentChecklist = () => {
 
         if (error) throw error;
 
-        if (data && data.length > 0) {
-          // Transform processes into document requirements
-          const processDocuments = data.flatMap(process => 
-            process.required_documents?.map((doc: string, index: number) => ({
-              id: `${process.id}-${index}`,
-              name: doc,
-              category: 'Process' as const,
-              required: true,
-              description: `Required for: ${process.name}`,
-              process_name: process.name
-            })) || []
-          );
-          setDocuments(processDocuments);
-        } else {
-          // Fallback data if no processes in database
-          setDocuments([
-            { id: 1, name: 'Passport', category: 'Identity', required: true, description: 'Valid passport with at least 6 months remaining validity' },
-            { id: 2, name: 'Employment Contract', category: 'Work', required: true, description: 'Signed employment contract or job offer letter' },
-            { id: 3, name: 'Rental Agreement', category: 'Housing', required: true, description: 'Rental contract or proof of accommodation' },
-            { id: 4, name: 'Proof of Income', category: 'Financial', required: true, description: 'Bank statements or salary slips for last 3 months' },
-            { id: 5, name: 'Health Insurance', category: 'Financial', required: true, description: 'Valid health insurance coverage in Poland' },
-            { id: 6, name: 'Diploma', category: 'Education', required: false, description: 'Educational certificates (if applicable)' },
-            { id: 7, name: 'Marriage Certificate', category: 'Identity', required: false, description: 'Marriage certificate (for family reunification)' },
-            { id: 8, name: 'Birth Certificate', category: 'Identity', required: false, description: 'Birth certificate of children (if applicable)' },
-          ]);
-        }
+        const processDocuments = data ? data.flatMap(process => 
+          process.required_documents?.map((doc: string, index: number) => ({
+            id: `${process.id}-${index}`,
+            name: doc,
+            category: 'Process' as const,
+            required: true,
+            description: `Required for: ${process.name}`,
+            process_name: process.name
+          })) || []
+        ) : [];
+        
+        setDocuments(processDocuments);
       } catch (error) {
         console.error('Error fetching document requirements:', error);
-        // Keep fallback data on error
-        setDocuments([
-          { id: 1, name: 'Passport', category: 'Identity', required: true, description: 'Valid passport with at least 6 months remaining validity' },
-          { id: 2, name: 'Employment Contract', category: 'Work', required: true, description: 'Signed employment contract or job offer letter' },
-          { id: 3, name: 'Rental Agreement', category: 'Housing', required: true, description: 'Rental contract or proof of accommodation' },
-        ]);
+        setDocuments([]);
       } finally {
         setIsLoading(false);
       }
@@ -501,15 +482,25 @@ const DocumentChecklist = () => {
       </div>
 
       {/* Required Documents */}
-      {requiredDocs.length > 0 && (
-        <Card className="shadow-card">
-          <CardHeader>
-            <CardTitle className="text-primary flex items-center">
-              <FileText className="w-5 h-5 mr-2" />
-              Required Documents
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
+      <Card className="shadow-card">
+        <CardHeader>
+          <CardTitle className="text-primary flex items-center">
+            <FileText className="w-5 h-5 mr-2" />
+            Required Documents ({requiredDocs.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {requiredDocs.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground">
+              <div className="flex flex-col items-center space-y-3">
+                <FileText className="w-12 h-12 text-muted-foreground/50" />
+                <div>
+                  <p className="font-medium">No required documents configured</p>
+                  <p className="text-sm">Add document requirements using the "Add Document" button above</p>
+                </div>
+              </div>
+            </div>
+          ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="border-b bg-muted/30">
@@ -561,10 +552,9 @@ const DocumentChecklist = () => {
                 </tbody>
               </table>
             </div>
-          </CardContent>
-        </Card>
-      )}
-
+          )}
+        </CardContent>
+      </Card>
       {/* Optional Documents */}
       {optionalDocs.length > 0 && (
         <Card className="shadow-card">

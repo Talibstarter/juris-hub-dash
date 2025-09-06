@@ -42,34 +42,17 @@ const Dashboard = () => {
           .order('created_at', { ascending: false })
           .limit(5);
 
-        if (activities && activities.length > 0) {
-          const formattedActivities = activities.map((activity, index) => ({
-            id: index + 1,
-            message: `System activity: ${activity.event}`,
-            time: new Date(activity.created_at).toLocaleString(),
-            type: 'client' as const
-          }));
-          setRecentActivities(formattedActivities);
-        } else {
-          // Fallback activities showing real system status
-          setRecentActivities([
-            { id: 1, message: 'Demo user case in review (Student visa)', time: '1 day ago', type: 'approval' },
-            { id: 2, message: 'Database connected successfully', time: '1 day ago', type: 'client' },
-            { id: 3, message: 'Security policies enabled', time: '1 day ago', type: 'client' },
-            { id: 4, message: 'Legal case management system active', time: '1 day ago', type: 'client' },
-            { id: 5, message: 'Dashboard connected to live data', time: '1 day ago', type: 'client' },
-          ]);
-        }
+        const formattedActivities = activities ? activities.map((activity, index) => ({
+          id: index + 1,
+          message: `System activity: ${activity.event}`,
+          time: new Date(activity.created_at).toLocaleString(),
+          type: 'client' as const
+        })) : [];
+        
+        setRecentActivities(formattedActivities);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
-        // Keep fallback activities on error
-        setRecentActivities([
-          { id: 1, message: 'Demo user case in review (Student visa)', time: '1 day ago', type: 'approval' },
-          { id: 2, message: 'Database connected successfully', time: '1 day ago', type: 'client' },
-          { id: 3, message: 'Security policies enabled', time: '1 day ago', type: 'client' },
-          { id: 4, message: 'Legal case management system active', time: '1 day ago', type: 'client' },
-          { id: 5, message: 'Dashboard connected to live data', time: '1 day ago', type: 'client' },
-        ]);
+        setRecentActivities([]);
       } finally {
         setIsLoading(false);
       }
@@ -128,20 +111,27 @@ const Dashboard = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {recentActivities.map((activity) => (
-              <div key={activity.id} className="flex items-start space-x-4 p-3 rounded-lg hover:bg-muted/50 transition-colors">
-                <div className={`w-2 h-2 rounded-full mt-2 ${
-                  activity.type === 'document' ? 'bg-primary' :
-                  activity.type === 'question' ? 'bg-accent' :
-                  activity.type === 'approval' ? 'bg-success' :
-                  'bg-muted-foreground'
-                }`} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground">{activity.message}</p>
-                  <p className="text-xs text-muted-foreground">{activity.time}</p>
-                </div>
+            {recentActivities.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">No recent activities</p>
+                <p className="text-xs text-muted-foreground">Activities will appear here when users interact with the system</p>
               </div>
-            ))}
+            ) : (
+              recentActivities.map((activity) => (
+                <div key={activity.id} className="flex items-start space-x-4 p-3 rounded-lg hover:bg-muted/50 transition-colors">
+                  <div className={`w-2 h-2 rounded-full mt-2 ${
+                    activity.type === 'document' ? 'bg-primary' :
+                    activity.type === 'question' ? 'bg-accent' :
+                    activity.type === 'approval' ? 'bg-success' :
+                    'bg-muted-foreground'
+                  }`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground">{activity.message}</p>
+                    <p className="text-xs text-muted-foreground">{activity.time}</p>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </CardContent>
       </Card>
