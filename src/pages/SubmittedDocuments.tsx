@@ -182,29 +182,49 @@ const SubmittedDocuments = () => {
         return;
       }
 
-      // Get the public URL for the file from Supabase storage
-      const { data: signedUrl } = await supabase.storage
-        .from('legal-bot')
-        .createSignedUrl(document.storage_key, 3600); // URL valid for 1 hour
-
-      if (signedUrl?.signedUrl) {
-        // Open the actual file in a new tab
-        window.open(signedUrl.signedUrl, '_blank', 'noopener,noreferrer');
-      } else {
-        // Fallback: try to get public URL if the bucket is public
-        const { data: publicUrl } = supabase.storage
+      try {
+        // First try to download the file as a blob to avoid domain blocking
+        const { data: fileData, error: downloadError } = await supabase.storage
           .from('legal-bot')
-          .getPublicUrl(document.storage_key);
+          .download(document.storage_key);
+
+        if (downloadError) throw downloadError;
+
+        if (fileData) {
+          // Create a blob URL and trigger download
+          const blob = new Blob([fileData], { type: document.mime_type || 'application/octet-stream' });
+          const url = window.URL.createObjectURL(blob);
+          
+          // Create a temporary link to trigger download
+          const link = window.document.createElement('a');
+          link.href = url;
+          link.download = document.original_name || 'document';
+          window.document.body.appendChild(link);
+          link.click();
+          
+          // Clean up
+          window.document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+          
+          console.log('File downloaded successfully');
+        }
+      } catch (downloadError) {
+        console.error('Download failed, trying signed URL:', downloadError);
         
-        if (publicUrl?.publicUrl) {
-          window.open(publicUrl.publicUrl, '_blank', 'noopener,noreferrer');
+        // Fallback: try signed URL method
+        const { data: signedUrl } = await supabase.storage
+          .from('legal-bot')
+          .createSignedUrl(document.storage_key, 3600);
+
+        if (signedUrl?.signedUrl) {
+          window.open(signedUrl.signedUrl, '_blank', 'noopener,noreferrer');
         } else {
-          alert('Unable to access file. Please check if the file exists in storage.');
+          alert('Unable to access file. Please try disabling ad blockers or use a different browser.');
         }
       }
     } catch (error) {
-      console.error('Error opening file:', error);
-      alert('Error opening file: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      console.error('Error accessing file:', error);
+      alert('Error accessing file. This might be caused by ad blockers. Try:\n1. Disable ad blockers\n2. Use incognito mode\n3. Try a different browser');
     }
   };
 
@@ -306,7 +326,7 @@ const SubmittedDocuments = () => {
                         <div 
                           className="flex items-center space-x-3 cursor-pointer hover:bg-muted/10 rounded-md p-2 -m-2 transition-colors group"
                           onClick={() => handleOpenFile(doc)}
-                          title="Click to open file in new tab"
+                          title="Click to download file"
                         >
                           <FileText className="w-5 h-5 text-primary" />
                           <div className="flex-1">
@@ -315,7 +335,7 @@ const SubmittedDocuments = () => {
                               <div className="text-xs text-muted-foreground">{doc.fileSize}</div>
                             )}
                           </div>
-                          <ExternalLink className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                          <div className="text-xs text-muted-foreground group-hover:text-primary transition-colors">Download</div>
                         </div>
                       </td>
                       <td className="p-4 text-muted-foreground">{doc.uploadDate}</td>
