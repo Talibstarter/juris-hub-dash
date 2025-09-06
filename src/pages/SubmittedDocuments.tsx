@@ -159,16 +159,53 @@ const SubmittedDocuments = () => {
     }
   };
 
-  const handleOpenFile = (doc: SubmittedDocument) => {
-    // For demo purposes, open a placeholder PDF in a new tab
-    // In a real implementation, this would fetch the actual file URL from Supabase storage
-    const fileUrl = `data:application/pdf;base64,JVBERi0xLjQKJdPr6eEKMSAwIG9iago8PAovVGl0bGUgKCR7ZG9jLmRvY3VtZW50TmFtZX0pCi9Dcmv=`;
-    
-    // Create a temporary URL for demonstration
-    const demoUrl = `https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf`;
-    
-    // Open file in new tab
-    window.open(demoUrl, '_blank', 'noopener,noreferrer');
+  const handleOpenFile = async (doc: SubmittedDocument) => {
+    try {
+      // Get the document details to find the storage key
+      const { data: userDoc, error: userDocError } = await supabase
+        .from('user_documents')
+        .select(`
+          documents (
+            storage_key,
+            original_name,
+            mime_type
+          )
+        `)
+        .eq('id', doc.id)
+        .single();
+
+      if (userDocError) throw userDocError;
+
+      const document = userDoc?.documents;
+      if (!document?.storage_key) {
+        alert('File not found in storage');
+        return;
+      }
+
+      // Get the public URL for the file from Supabase storage
+      const { data: signedUrl } = await supabase.storage
+        .from('legal-bot')
+        .createSignedUrl(document.storage_key, 3600); // URL valid for 1 hour
+
+      if (signedUrl?.signedUrl) {
+        // Open the actual file in a new tab
+        window.open(signedUrl.signedUrl, '_blank', 'noopener,noreferrer');
+      } else {
+        // Fallback: try to get public URL if the bucket is public
+        const { data: publicUrl } = supabase.storage
+          .from('legal-bot')
+          .getPublicUrl(document.storage_key);
+        
+        if (publicUrl?.publicUrl) {
+          window.open(publicUrl.publicUrl, '_blank', 'noopener,noreferrer');
+        } else {
+          alert('Unable to access file. Please check if the file exists in storage.');
+        }
+      }
+    } catch (error) {
+      console.error('Error opening file:', error);
+      alert('Error opening file: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    }
   };
 
   const pendingDocs = documents.filter(doc => doc.status === 'pending');
