@@ -51,7 +51,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         await supabase.rpc('set_config', {
           setting_name: 'app.current_user_id',
           setting_value: '1'
-        });
+        } as any);
         
         setUser(mockUser);
         localStorage.setItem('user', JSON.stringify(mockUser));
@@ -67,11 +67,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     if (storedUser) {
       const user = JSON.parse(storedUser);
       setUser(user);
-      // Set Supabase context for RLS
-      supabase.rpc('set_config', {
-        setting_name: 'app.current_user_id',
-        setting_value: user.id
-      }).catch(console.error);
+      // Set Supabase context for RLS in an async function
+      const setUserContext = async () => {
+        try {
+          await supabase.rpc('set_config', {
+            setting_name: 'app.current_user_id',
+            setting_value: user.id
+          } as any);
+        } catch (error) {
+          console.error('Error setting user context:', error);
+        }
+      };
+      setUserContext();
       setIsLoading(false);
     } else {
       // Initialize with demo user
@@ -95,7 +102,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         await supabase.rpc('set_config', {
           setting_name: 'app.current_user_id',
           setting_value: '1'
-        });
+        } as any);
         
         setUser(mockUser);
         localStorage.setItem('user', JSON.stringify(mockUser));

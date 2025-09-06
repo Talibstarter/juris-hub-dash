@@ -671,6 +671,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      set_config: {
+        Args: { setting_name: string; setting_value: string }
+        Returns: undefined
+      }
     }
     Enums: {
       case_status:
