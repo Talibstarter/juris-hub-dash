@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 interface User {
   id: string;
   email: string;
-  role: 'admin' | 'lawyer' | 'client';
+  role: 'lawyer' | 'assistant' | 'client';
   first_name?: string;
   last_name?: string;
 }
@@ -36,25 +36,67 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Initialize with lawyer user for demo purposes
+    const initializeAuth = async () => {
+      try {
+        const mockUser: User = {
+          id: '1',
+          email: 'lawyer@test.com',
+          role: 'lawyer',
+          first_name: 'Legal',
+          last_name: 'Expert'
+        };
+        
+        // Set the current user context in Supabase for RLS policies
+        await supabase.rpc('set_config', {
+          setting_name: 'app.current_user_id',
+          setting_value: '1'
+        });
+        
+        setUser(mockUser);
+        localStorage.setItem('user', JSON.stringify(mockUser));
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     // Check if user is already logged in
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      const user = JSON.parse(storedUser);
+      setUser(user);
+      // Set Supabase context for RLS
+      supabase.rpc('set_config', {
+        setting_name: 'app.current_user_id',
+        setting_value: user.id
+      }).catch(console.error);
+      setIsLoading(false);
+    } else {
+      // Initialize with demo user
+      initializeAuth();
     }
-    setIsLoading(false);
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
     // Mock authentication for testing - in production this would validate against database
-    if (email === 'admin@test.com' && password === 'password123') {
+    if (email === 'lawyer@test.com' && password === 'password123') {
       try {
         const mockUser: User = {
           id: '1',
-          email: 'admin@test.com',
-          role: 'admin',
-          first_name: 'Admin',
-          last_name: 'User'
+          email: 'lawyer@test.com',
+          role: 'lawyer',
+          first_name: 'Legal',
+          last_name: 'Expert'
         };
+        
+        // Set the current user context in Supabase for RLS policies
+        await supabase.rpc('set_config', {
+          setting_name: 'app.current_user_id',
+          setting_value: '1'
+        });
+        
         setUser(mockUser);
         localStorage.setItem('user', JSON.stringify(mockUser));
         return true;
