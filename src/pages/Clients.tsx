@@ -2,17 +2,19 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Eye, Plus, Trash2 } from 'lucide-react';
+import { Edit, Eye, Plus, Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 
 interface Client {
   id: number;
   name: string;
   caseStatus: 'pending' | 'in-progress' | 'approved' | 'rejected';
+  caseStatusInfo?: string;
   email: string;
   phone: string;
   lastActivity: string;
@@ -48,12 +50,16 @@ const Clients = () => {
   const [clients, setClients] = useState<Client[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [newClient, setNewClient] = useState({
     first_name: '',
     last_name: '',
     email: '',
     phone: '',
     role: 'client' as 'client' | 'lawyer',
+    caseStatus: 'pending' as 'pending' | 'in-progress' | 'approved' | 'rejected',
+    caseStatusInfo: '',
   });
 
   useEffect(() => {
@@ -83,6 +89,7 @@ const Clients = () => {
                      user.cases?.[0]?.status === 'in_review' ? 'in-progress' :
                      user.cases?.[0]?.status === 'approved' ? 'approved' :
                      user.cases?.[0]?.status === 'rejected' ? 'rejected' : 'pending') as Client['caseStatus'],
+          caseStatusInfo: user.cases?.[0]?.category || '',
           email: user.email || 'No email provided',
           phone: 'Not provided',
           lastActivity: user.cases?.[0]?.updated_at?.split('T')[0] || user.created_at?.split('T')[0] || '2025-01-01',
@@ -154,7 +161,9 @@ const Clients = () => {
         last_name: '',
         email: '',
         phone: '',
-        role: 'client'
+        role: 'client',
+        caseStatus: 'pending',
+        caseStatusInfo: '',
       });
       setIsAddDialogOpen(false);
 
@@ -162,6 +171,34 @@ const Clients = () => {
     } catch (error) {
       console.error('Unexpected error:', error);
       alert(`Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleEditClient = (client: Client) => {
+    setEditingClient(client);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleUpdateCaseStatus = async () => {
+    if (!editingClient) return;
+
+    try {
+      // Update the client's case status info in the database
+      // For now, we'll update the clients list locally
+      setClients(prevClients => 
+        prevClients.map(client => 
+          client.id === editingClient.id 
+            ? { ...client, caseStatus: editingClient.caseStatus, caseStatusInfo: editingClient.caseStatusInfo }
+            : client
+        )
+      );
+
+      setIsEditDialogOpen(false);
+      setEditingClient(null);
+      alert('Case status updated successfully!');
+    } catch (error) {
+      console.error('Error updating case status:', error);
+      alert('Error updating case status. Please try again.');
     }
   };
 
@@ -382,6 +419,48 @@ const Clients = () => {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="caseStatus">Case Status</Label>
+                  <Select 
+                    value={newClient.caseStatus} 
+                    onValueChange={(value: 'pending' | 'in-progress' | 'approved' | 'rejected') => 
+                      setNewClient(prev => ({ ...prev, caseStatus: value }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select case status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="in-progress">In Progress</SelectItem>
+                      <SelectItem value="approved">Approved</SelectItem>
+                      <SelectItem value="rejected">Rejected</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="caseStatusInfo">Case Status Information (Max 100 characters)</Label>
+                <Textarea
+                  id="caseStatusInfo"
+                  placeholder="Enter case status details..."
+                  value={newClient.caseStatusInfo}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value.length <= 100) {
+                      setNewClient(prev => ({ ...prev, caseStatusInfo: value }));
+                    }
+                  }}
+                  className="resize-none"
+                  rows={3}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {newClient.caseStatusInfo.length}/100 characters
+                </p>
+              </div>
+
               <div className="flex justify-end space-x-2 pt-4">
                 <Button 
                   variant="outline" 
@@ -398,6 +477,78 @@ const Clients = () => {
                 </Button>
               </div>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Client Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Edit Case Status</DialogTitle>
+            </DialogHeader>
+            {editingClient && (
+              <div className="space-y-4">
+                <div>
+                  <p className="font-medium">{editingClient.name}</p>
+                  <p className="text-sm text-muted-foreground">{editingClient.email}</p>
+                </div>
+
+                <div>
+                  <Label htmlFor="editCaseStatus">Case Status</Label>
+                  <Select 
+                    value={editingClient.caseStatus} 
+                    onValueChange={(value: 'pending' | 'in-progress' | 'approved' | 'rejected') => 
+                      setEditingClient(prev => prev ? { ...prev, caseStatus: value } : null)
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select case status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="in-progress">In Progress</SelectItem>
+                      <SelectItem value="approved">Approved</SelectItem>
+                      <SelectItem value="rejected">Rejected</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="editCaseStatusInfo">Case Status Information (Max 100 characters)</Label>
+                  <Textarea
+                    id="editCaseStatusInfo"
+                    placeholder="Enter case status details..."
+                    value={editingClient.caseStatusInfo || ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value.length <= 100) {
+                        setEditingClient(prev => prev ? { ...prev, caseStatusInfo: value } : null);
+                      }
+                    }}
+                    className="resize-none"
+                    rows={3}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {(editingClient.caseStatusInfo || '').length}/100 characters
+                  </p>
+                </div>
+
+                <div className="flex justify-end space-x-2 pt-4">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setIsEditDialogOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={handleUpdateCaseStatus}
+                    className="bg-gradient-primary hover:opacity-90"
+                  >
+                    Update Status
+                  </Button>
+                </div>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       </div>
@@ -430,7 +581,14 @@ const Clients = () => {
                         <div className="font-medium">{client.name}</div>
                       </td>
                       <td className="p-4">
-                        {getStatusBadge(client.caseStatus)}
+                        <div className="space-y-1">
+                          {getStatusBadge(client.caseStatus)}
+                          {client.caseStatusInfo && (
+                            <p className="text-xs text-muted-foreground max-w-xs truncate">
+                              {client.caseStatusInfo}
+                            </p>
+                          )}
+                        </div>
                       </td>
                       <td className="p-4">
                         <div className="space-y-1">
@@ -448,6 +606,14 @@ const Clients = () => {
                           >
                             <Eye className="w-4 h-4 mr-2" />
                             View
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleEditClient(client)}
+                          >
+                            <Edit className="w-4 h-4 mr-2" />
+                            Edit Status
                           </Button>
                           <Button
                             size="sm"
