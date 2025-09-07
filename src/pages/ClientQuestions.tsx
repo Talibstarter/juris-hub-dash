@@ -47,65 +47,51 @@ const ClientQuestions = () => {
   useEffect(() => {
     const fetchQuestions = async () => {
       try {
-        const { data, error } = await supabase
+        const { data: questionsData, error } = await supabase
           .from('questions')
-          .select(`
-            *,
-            users!questions_user_id_fkey (
-              first_name,
-              last_name
-            )
-          `)
+          .select('*')
           .order('created_at', { ascending: false });
 
         if (error) throw error;
 
-        if (data && data.length > 0) {
-          const formattedQuestions = data.map(q => ({
-            id: q.id,
-            clientName: `${q.users?.first_name || 'Unknown'} ${q.users?.last_name || 'User'}`.trim(),
-            question: q.text,
-            dateSubmitted: q.created_at?.split('T')[0] || '2025-01-01',
-            status: (q.status === 'new' ? 'open' : 
-                    q.status === 'answered' ? 'answered' : 'pending') as Question['status'],
-            language: q.lang || 'English',
-            answer: q.answer
-          }));
+        if (questionsData && questionsData.length > 0) {
+          // Get unique user_ids from questions
+          const userIds = [...new Set(questionsData.map(q => q.user_id).filter(Boolean))];
+          
+          // Fetch user data for these user_ids
+          const { data: usersData } = await supabase
+            .from('users')
+            .select('id, first_name, last_name')
+            .in('id', userIds);
+
+          // Create a map of user_id to user data
+          const usersMap = new Map();
+          usersData?.forEach(user => {
+            usersMap.set(user.id, user);
+          });
+
+          const formattedQuestions = questionsData.map(q => {
+            const user = usersMap.get(q.user_id);
+            return {
+              id: q.id,
+              clientName: user 
+                ? `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Unknown User'
+                : 'Unknown User',
+              question: q.text,
+              dateSubmitted: q.created_at?.split('T')[0] || '2025-01-01',
+              status: (q.status === 'new' ? 'open' : 
+                      q.status === 'answered' ? 'answered' : 'pending') as Question['status'],
+              language: q.lang || 'English',
+              answer: q.answer
+            };
+          });
           setQuestions(formattedQuestions);
         } else {
-          // Fallback data if no questions in database
-          setQuestions([
-            {
-              id: 1,
-              clientName: 'Demo User',
-              question: 'When will my student visa Karta Pobytu be ready? I submitted all documents last month.',
-              dateSubmitted: '2025-01-09',
-              status: 'open',
-              language: 'English'
-            },
-            {
-              id: 2,
-              clientName: 'Sample Client',
-              question: 'Can I travel abroad while waiting for the decision? I have urgent business travel.',
-              dateSubmitted: '2025-01-08',
-              status: 'open',
-              language: 'English'
-            },
-          ]);
+          setQuestions([]);
         }
       } catch (error) {
         console.error('Error fetching questions:', error);
-        // Keep fallback data on error
-        setQuestions([
-          {
-            id: 1,
-            clientName: 'Demo User',
-            question: 'When will my student visa Karta Pobytu be ready?',
-            dateSubmitted: '2025-01-09',
-            status: 'open',
-            language: 'English'
-          }
-        ]);
+        setQuestions([]);
       } finally {
         setIsLoading(false);
       }
