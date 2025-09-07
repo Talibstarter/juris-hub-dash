@@ -107,46 +107,35 @@ const Clients = () => {
   useEffect(() => {
     const fetchClients = async () => {
       try {
-        const { data: users, error } = await supabase
-          .from('users')
-          .select(`
-            *,
-            cases (
-              id,
-              status,
-              category,
-              public_case_id,
-              created_at,
-              updated_at
-            )
-          `)
+        const { data, error } = await supabase
+          .from('cases')
+          .select('*')
           .order('created_at', { ascending: false });
 
         if (error) throw error;
 
-        const formattedClients = users?.map((user, index) => ({
-          id: user.id,
-          name: `${user.first_name || 'Unknown'} ${user.last_name || 'User'}`.trim(),
-          firstName: user.first_name || 'Unknown',
-          lastName: user.last_name || 'User',
-          caseNumber: user.cases?.[0]?.public_case_id || `CASE-${String(index + 1).padStart(4, '0')}`,
-          applicationType: user.cases?.[0]?.category || 'Temporary Residence',
-          typeOfStay: 'Work Permit',
-          office: ['Warsaw Office', 'Krakow Office', 'Gdansk Office'][index % 3],
-          inspector: ['Jan Kowalski', 'Anna Nowak', 'Piotr Zielinski'][index % 3],
-          biometricsDate: '2025-02-15',
-          decision: (user.cases?.[0]?.status === 'approved' ? 'positive' : 
-                    user.cases?.[0]?.status === 'rejected' ? 'negative' : 'pending') as Client['decision'],
-          paymentStatus: (['paid', 'unpaid', 'partial'] as const)[index % 3],
-          email: user.email || 'No email provided',
-          phone: '123-456-789',
-          dateOfBirth: '1990-01-01',
-          postalCode: '00-001',
-          reviewDate: '2025-03-01',
-          appeal: false,
-          expediteRequest: false,
-          paymentAmount: '1500 PLN',
-          notes: 'Initial consultation completed. Awaiting document review.'
+        const formattedClients = data?.map(caseData => ({
+          id: caseData.id,
+          name: caseData.client_name || 'Unknown Client',
+          firstName: caseData.client_name?.split(' ')[0] || 'Unknown',
+          lastName: caseData.client_name?.split(' ').slice(1).join(' ') || 'Client',
+          caseNumber: caseData.public_case_id || `CASE-${caseData.id}`,
+          applicationType: caseData.application_type || 'Temporary Residence',
+          typeOfStay: caseData.type_of_stay || 'Work Permit',
+          office: caseData.office || 'Warsaw Office',
+          inspector: caseData.inspector || 'Jan Kowalski',
+          biometricsDate: caseData.biometrics_date || '2025-02-15',
+          decision: (caseData.decision || 'pending') as Client['decision'],
+          paymentStatus: (caseData.payment_status || 'unpaid') as Client['paymentStatus'],
+          email: 'N/A',
+          phone: caseData.phone_e164 || 'N/A',
+          dateOfBirth: caseData.date_of_birth || '1990-01-01',
+          postalCode: caseData.postal_code || '00-001',
+          reviewDate: caseData.review_date || '2025-03-01',
+          appeal: caseData.appeal || false,
+          expediteRequest: caseData.expedite_request || false,
+          paymentAmount: caseData.payment_amount ? `${caseData.payment_amount} PLN` : '1500 PLN',
+          notes: caseData.notes || 'Initial consultation completed. Awaiting document review.'
         })) || [];
 
         setClients(formattedClients);
@@ -200,16 +189,26 @@ const Clients = () => {
     }
 
     try {
+      // Create a new case record directly
       const { data, error } = await supabase
-        .from('users')
+        .from('cases')
         .insert([{
-          first_name: newClient.firstName.trim(),
-          last_name: newClient.lastName.trim(),
-          email: newClient.email.trim(),
-          role: 'client',
-          telegram_id: Math.floor(Math.random() * 1000000000),
-          preferred_lang: 'en',
-          is_active: true
+          client_name: `${newClient.firstName.trim()} ${newClient.lastName.trim()}`,
+          public_case_id: `CASE-${Date.now()}`,
+          application_type: newClient.applicationType || 'Temporary Residence',
+          type_of_stay: newClient.typeOfStay || 'Work Permit',
+          office: newClient.office || 'Warsaw Office',
+          inspector: newClient.inspector || 'Jan Kowalski',
+          date_of_birth: newClient.dateOfBirth || null,
+          postal_code: newClient.postalCode || null,
+          phone_e164: newClient.phone || null,
+          decision: 'pending',
+          payment_status: 'unpaid',
+          appeal: false,
+          expedite_request: false,
+          status: 'new',
+          category: 'other',
+          active: true
         }])
         .select()
         .single();
@@ -222,26 +221,26 @@ const Clients = () => {
 
       const formattedClient: Client = {
         id: data.id,
-        name: `${data.first_name} ${data.last_name}`,
-        firstName: data.first_name,
-        lastName: data.last_name,
-        caseNumber: `CASE-${String(clients.length + 1).padStart(4, '0')}`,
-        applicationType: newClient.applicationType || 'Temporary Residence',
-        typeOfStay: newClient.typeOfStay || 'Work Permit',
-        office: newClient.office || 'Warsaw Office',
-        inspector: newClient.inspector || 'Jan Kowalski',
-        biometricsDate: '2025-02-15',
-        decision: 'pending',
-        paymentStatus: 'unpaid',
-        email: data.email,
-        phone: newClient.phone || '123-456-789',
-        dateOfBirth: newClient.dateOfBirth || '1990-01-01',
-        postalCode: newClient.postalCode || '00-001',
-        reviewDate: '2025-03-01',
-        appeal: false,
-        expediteRequest: false,
-        paymentAmount: '1500 PLN',
-        notes: ''
+        name: data.client_name,
+        firstName: data.client_name.split(' ')[0],
+        lastName: data.client_name.split(' ').slice(1).join(' '),
+        caseNumber: data.public_case_id,
+        applicationType: data.application_type,
+        typeOfStay: data.type_of_stay,
+        office: data.office,
+        inspector: data.inspector,
+        biometricsDate: data.biometrics_date || '2025-02-15',
+        decision: data.decision as Client['decision'],
+        paymentStatus: data.payment_status as Client['paymentStatus'],
+        email: newClient.email,
+        phone: data.phone_e164 || newClient.phone,
+        dateOfBirth: data.date_of_birth || newClient.dateOfBirth,
+        postalCode: data.postal_code || newClient.postalCode,
+        reviewDate: data.review_date || '2025-03-01',
+        appeal: data.appeal,
+        expediteRequest: data.expedite_request,
+        paymentAmount: data.payment_amount ? `${data.payment_amount} PLN` : '1500 PLN',
+        notes: data.notes || ''
       };
 
       setClients(prevClients => [formattedClient, ...prevClients]);
@@ -270,11 +269,23 @@ const Clients = () => {
 
     try {
       const { error } = await supabase
-        .from('users')
+        .from('cases')
         .update({
-          first_name: selectedClient.firstName,
-          last_name: selectedClient.lastName,
-          email: selectedClient.email,
+          client_name: selectedClient.name,
+          application_type: selectedClient.applicationType,
+          type_of_stay: selectedClient.typeOfStay,
+          office: selectedClient.office,
+          inspector: selectedClient.inspector,
+          biometrics_date: selectedClient.biometricsDate,
+          decision: selectedClient.decision,
+          payment_status: selectedClient.paymentStatus,
+          payment_amount: selectedClient.paymentAmount ? parseFloat(selectedClient.paymentAmount.replace(' PLN', '')) : null,
+          review_date: selectedClient.reviewDate,
+          appeal: selectedClient.appeal,
+          expedite_request: selectedClient.expediteRequest,
+          date_of_birth: selectedClient.dateOfBirth,
+          postal_code: selectedClient.postalCode,
+          notes: selectedClient.notes
         })
         .eq('id', selectedClient.id);
 
@@ -303,7 +314,7 @@ const Clients = () => {
 
     try {
       const { error } = await supabase
-        .from('users')
+        .from('cases')
         .delete()
         .eq('id', selectedClient.id);
 

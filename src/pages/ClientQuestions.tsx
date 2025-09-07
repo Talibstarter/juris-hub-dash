@@ -55,23 +55,23 @@ const ClientQuestions = () => {
         if (error) throw error;
 
         if (questionsData && questionsData.length > 0) {
-          // Get unique user_ids from questions
-          const userIds = [...new Set(questionsData.map(q => q.user_id).filter(Boolean))];
+          // Get unique telegram_ids from questions
+          const telegramIds = [...new Set(questionsData.map(q => q.telegram_id).filter(Boolean))];
           
-          // Fetch user data for these user_ids
+          // Fetch user data for these telegram_ids
           const { data: usersData } = await supabase
             .from('users')
-            .select('id, first_name, last_name')
-            .in('id', userIds);
+            .select('id, first_name, last_name, telegram_id')
+            .in('telegram_id', telegramIds);
 
-          // Create a map of user_id to user data
+          // Create a map of telegram_id to user data
           const usersMap = new Map();
           usersData?.forEach(user => {
-            usersMap.set(user.id, user);
+            usersMap.set(user.telegram_id, user);
           });
 
           const formattedQuestions = questionsData.map(q => {
-            const user = usersMap.get(q.user_id);
+            const user = usersMap.get(q.telegram_id);
             return {
               id: q.id,
               clientName: user 

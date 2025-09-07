@@ -144,42 +144,96 @@ export type Database = {
       }
       cases: {
         Row: {
+          active: boolean | null
+          appeal: boolean | null
+          application_type: string | null
+          biometrics_date: string | null
           category: string | null
+          client_name: string | null
           created_at: string | null
+          date_of_birth: string | null
+          decision: string | null
+          expedite_request: boolean | null
           id: number
+          inspector: string | null
+          notes: string | null
+          office: string | null
+          payment_amount: number | null
+          payment_status: string | null
+          phone_e164: string | null
+          postal_code: string | null
           public_case_id: string
+          review_date: string | null
           status: Database["public"]["Enums"]["case_status"]
           tags: string[] | null
+          telegram_id: number | null
+          type_of_stay: string | null
           updated_at: string | null
-          user_id: number | null
+          username: string | null
         }
         Insert: {
+          active?: boolean | null
+          appeal?: boolean | null
+          application_type?: string | null
+          biometrics_date?: string | null
           category?: string | null
+          client_name?: string | null
           created_at?: string | null
+          date_of_birth?: string | null
+          decision?: string | null
+          expedite_request?: boolean | null
           id?: number
+          inspector?: string | null
+          notes?: string | null
+          office?: string | null
+          payment_amount?: number | null
+          payment_status?: string | null
+          phone_e164?: string | null
+          postal_code?: string | null
           public_case_id: string
+          review_date?: string | null
           status?: Database["public"]["Enums"]["case_status"]
           tags?: string[] | null
+          telegram_id?: number | null
+          type_of_stay?: string | null
           updated_at?: string | null
-          user_id?: number | null
+          username?: string | null
         }
         Update: {
+          active?: boolean | null
+          appeal?: boolean | null
+          application_type?: string | null
+          biometrics_date?: string | null
           category?: string | null
+          client_name?: string | null
           created_at?: string | null
+          date_of_birth?: string | null
+          decision?: string | null
+          expedite_request?: boolean | null
           id?: number
+          inspector?: string | null
+          notes?: string | null
+          office?: string | null
+          payment_amount?: number | null
+          payment_status?: string | null
+          phone_e164?: string | null
+          postal_code?: string | null
           public_case_id?: string
+          review_date?: string | null
           status?: Database["public"]["Enums"]["case_status"]
           tags?: string[] | null
+          telegram_id?: number | null
+          type_of_stay?: string | null
           updated_at?: string | null
-          user_id?: number | null
+          username?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "cases_user_id_fkey"
-            columns: ["user_id"]
+            foreignKeyName: "cases_telegram_id_fkey"
+            columns: ["telegram_id"]
             isOneToOne: false
             referencedRelation: "users"
-            referencedColumns: ["id"]
+            referencedColumns: ["telegram_id"]
           },
         ]
       }
@@ -461,8 +515,8 @@ export type Database = {
           id: number
           lang: string
           status: Database["public"]["Enums"]["question_status"]
+          telegram_id: number
           text: string
-          user_id: number | null
         }
         Insert: {
           answer?: string | null
@@ -473,8 +527,8 @@ export type Database = {
           id?: number
           lang?: string
           status?: Database["public"]["Enums"]["question_status"]
+          telegram_id: number
           text: string
-          user_id?: number | null
         }
         Update: {
           answer?: string | null
@@ -485,8 +539,8 @@ export type Database = {
           id?: number
           lang?: string
           status?: Database["public"]["Enums"]["question_status"]
+          telegram_id?: number
           text?: string
-          user_id?: number | null
         }
         Relationships: [
           {
@@ -494,7 +548,7 @@ export type Database = {
             columns: ["answered_by"]
             isOneToOne: false
             referencedRelation: "users"
-            referencedColumns: ["id"]
+            referencedColumns: ["telegram_id"]
           },
           {
             foreignKeyName: "questions_case_id_fkey"
@@ -504,11 +558,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "questions_user_id_fkey"
-            columns: ["user_id"]
+            foreignKeyName: "questions_telegram_id_fkey"
+            columns: ["telegram_id"]
             isOneToOne: false
             referencedRelation: "users"
-            referencedColumns: ["id"]
+            referencedColumns: ["telegram_id"]
           },
         ]
       }
