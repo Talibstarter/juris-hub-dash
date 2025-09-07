@@ -2,40 +2,71 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Eye, Plus, Trash2 } from 'lucide-react';
+import { Search, Plus, Download, Filter, Edit, Save, Trash2, ArrowLeft } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 
 interface Client {
   id: number;
   name: string;
-  caseStatus: 'pending' | 'in-progress' | 'approved' | 'rejected';
-  caseStatusInfo?: string;
+  firstName: string;
+  lastName: string;
+  caseNumber: string;
+  applicationType: string;
+  typeOfStay: string;
+  office: string;
+  inspector: string;
+  biometricsDate: string;
+  decision: 'pending' | 'positive' | 'negative';
+  paymentStatus: 'paid' | 'unpaid' | 'partial';
   email: string;
   phone: string;
-  lastActivity: string;
-  case_id?: string;
-  role?: string;
-  telegram_id?: number;
+  dateOfBirth: string;
+  postalCode: string;
+  reviewDate: string;
+  appeal: boolean;
+  expediteRequest: boolean;
+  paymentAmount?: string;
+  notes: string;
 }
 
-const getStatusBadge = (status: Client['caseStatus']) => {
+const getDecisionBadge = (decision: Client['decision']) => {
   const variants = {
-    pending: 'bg-warning/10 text-warning border-warning/20',
-    'in-progress': 'bg-primary/10 text-primary border-primary/20',
-    approved: 'bg-success/10 text-success border-success/20',
-    rejected: 'bg-destructive/10 text-destructive border-destructive/20'
+    pending: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+    positive: 'bg-green-100 text-green-800 border-green-300',
+    negative: 'bg-red-100 text-red-800 border-red-300'
   };
   
   const labels = {
     pending: 'Pending',
-    'in-progress': 'In Progress',
-    approved: 'Approved',
-    rejected: 'Rejected'
+    positive: 'Positive',
+    negative: 'Negative'
+  };
+
+  return (
+    <Badge variant="outline" className={variants[decision]}>
+      {labels[decision]}
+    </Badge>
+  );
+};
+
+const getPaymentBadge = (status: Client['paymentStatus']) => {
+  const variants = {
+    paid: 'bg-green-100 text-green-800 border-green-300',
+    unpaid: 'bg-red-100 text-red-800 border-red-300',
+    partial: 'bg-yellow-100 text-yellow-800 border-yellow-300'
+  };
+  
+  const labels = {
+    paid: 'Paid',
+    unpaid: 'Unpaid',
+    partial: 'Partial'
   };
 
   return (
@@ -48,18 +79,29 @@ const getStatusBadge = (status: Client['caseStatus']) => {
 const Clients = () => {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
+  const [filteredClients, setFilteredClients] = useState<Client[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  
+  // Search and filter states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [decisionFilter, setDecisionFilter] = useState<string>('all');
+  const [officeFilter, setOfficeFilter] = useState<string>('all');
+  const [inspectorFilter, setInspectorFilter] = useState<string>('all');
+  
+  // New client form
   const [newClient, setNewClient] = useState({
-    first_name: '',
-    last_name: '',
+    firstName: '',
+    lastName: '',
     email: '',
     phone: '',
-    role: 'client' as 'client' | 'lawyer',
-    caseStatus: 'pending' as 'pending' | 'in-progress' | 'approved' | 'rejected',
-    caseStatusInfo: '',
+    dateOfBirth: '',
+    postalCode: '',
+    applicationType: '',
+    typeOfStay: '',
+    office: '',
+    inspector: '',
   });
 
   useEffect(() => {
@@ -82,27 +124,37 @@ const Clients = () => {
 
         if (error) throw error;
 
-        const formattedClients = users?.map(user => ({
+        const formattedClients = users?.map((user, index) => ({
           id: user.id,
           name: `${user.first_name || 'Unknown'} ${user.last_name || 'User'}`.trim(),
-          caseStatus: (user.cases?.[0]?.status === 'new' ? 'pending' : 
-                     user.cases?.[0]?.status === 'in_review' ? 'in-progress' :
-                     user.cases?.[0]?.status === 'approved' ? 'approved' :
-                     user.cases?.[0]?.status === 'rejected' ? 'rejected' : 'pending') as Client['caseStatus'],
-          caseStatusInfo: user.cases?.[0]?.category || '',
+          firstName: user.first_name || 'Unknown',
+          lastName: user.last_name || 'User',
+          caseNumber: user.cases?.[0]?.public_case_id || `CASE-${String(index + 1).padStart(4, '0')}`,
+          applicationType: user.cases?.[0]?.category || 'Temporary Residence',
+          typeOfStay: 'Work Permit',
+          office: ['Warsaw Office', 'Krakow Office', 'Gdansk Office'][index % 3],
+          inspector: ['Jan Kowalski', 'Anna Nowak', 'Piotr Zielinski'][index % 3],
+          biometricsDate: '2025-02-15',
+          decision: (user.cases?.[0]?.status === 'approved' ? 'positive' : 
+                    user.cases?.[0]?.status === 'rejected' ? 'negative' : 'pending') as Client['decision'],
+          paymentStatus: (['paid', 'unpaid', 'partial'] as const)[index % 3],
           email: user.email || 'No email provided',
-          phone: 'Not provided',
-          lastActivity: user.cases?.[0]?.updated_at?.split('T')[0] || user.created_at?.split('T')[0] || '2025-01-01',
-          case_id: user.cases?.[0]?.public_case_id,
-          role: user.role,
-          telegram_id: user.telegram_id
+          phone: '123-456-789',
+          dateOfBirth: '1990-01-01',
+          postalCode: '00-001',
+          reviewDate: '2025-03-01',
+          appeal: false,
+          expediteRequest: false,
+          paymentAmount: '1500 PLN',
+          notes: 'Initial consultation completed. Awaiting document review.'
         })) || [];
 
         setClients(formattedClients);
+        setFilteredClients(formattedClients);
       } catch (error) {
         console.error('Error fetching clients:', error);
-        // Fallback to empty array on error
         setClients([]);
+        setFilteredClients([]);
       } finally {
         setIsLoading(false);
       }
@@ -111,23 +163,51 @@ const Clients = () => {
     fetchClients();
   }, []);
 
+  // Filter and search effect
+  useEffect(() => {
+    let filtered = clients;
+
+    // Apply search filter
+    if (searchQuery) {
+      filtered = filtered.filter(client =>
+        client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        client.caseNumber.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    // Apply decision filter
+    if (decisionFilter !== 'all') {
+      filtered = filtered.filter(client => client.decision === decisionFilter);
+    }
+
+    // Apply office filter
+    if (officeFilter !== 'all') {
+      filtered = filtered.filter(client => client.office === officeFilter);
+    }
+
+    // Apply inspector filter
+    if (inspectorFilter !== 'all') {
+      filtered = filtered.filter(client => client.inspector === inspectorFilter);
+    }
+
+    setFilteredClients(filtered);
+  }, [clients, searchQuery, decisionFilter, officeFilter, inspectorFilter]);
+
   const handleAddClient = async () => {
-    if (!newClient.first_name.trim() || !newClient.last_name.trim() || !newClient.email.trim()) {
-      alert('Please fill in first name, last name, and email fields');
+    if (!newClient.firstName.trim() || !newClient.lastName.trim() || !newClient.email.trim()) {
+      alert('Please fill in required fields');
       return;
     }
 
     try {
-      console.log('Adding new client:', newClient);
-      
       const { data, error } = await supabase
         .from('users')
         .insert([{
-          first_name: newClient.first_name.trim(),
-          last_name: newClient.last_name.trim(),
+          first_name: newClient.firstName.trim(),
+          last_name: newClient.lastName.trim(),
           email: newClient.email.trim(),
-          role: newClient.role,
-          telegram_id: Math.floor(Math.random() * 1000000000), // Generate random telegram_id
+          role: 'client',
+          telegram_id: Math.floor(Math.random() * 1000000000),
           preferred_lang: 'en',
           is_active: true
         }])
@@ -140,33 +220,44 @@ const Clients = () => {
         return;
       }
 
-      console.log('Client added successfully:', data);
-
-      // Add the new client to local state
       const formattedClient: Client = {
         id: data.id,
         name: `${data.first_name} ${data.last_name}`,
-        caseStatus: 'pending',
+        firstName: data.first_name,
+        lastName: data.last_name,
+        caseNumber: `CASE-${String(clients.length + 1).padStart(4, '0')}`,
+        applicationType: newClient.applicationType || 'Temporary Residence',
+        typeOfStay: newClient.typeOfStay || 'Work Permit',
+        office: newClient.office || 'Warsaw Office',
+        inspector: newClient.inspector || 'Jan Kowalski',
+        biometricsDate: '2025-02-15',
+        decision: 'pending',
+        paymentStatus: 'unpaid',
         email: data.email,
-        phone: 'Not provided',
-        lastActivity: new Date().toISOString().split('T')[0],
-        role: data.role
+        phone: newClient.phone || '123-456-789',
+        dateOfBirth: newClient.dateOfBirth || '1990-01-01',
+        postalCode: newClient.postalCode || '00-001',
+        reviewDate: '2025-03-01',
+        appeal: false,
+        expediteRequest: false,
+        paymentAmount: '1500 PLN',
+        notes: ''
       };
 
       setClients(prevClients => [formattedClient, ...prevClients]);
-
-      // Reset form and close dialog
       setNewClient({
-        first_name: '',
-        last_name: '',
+        firstName: '',
+        lastName: '',
         email: '',
         phone: '',
-        role: 'client',
-        caseStatus: 'pending',
-        caseStatusInfo: '',
+        dateOfBirth: '',
+        postalCode: '',
+        applicationType: '',
+        typeOfStay: '',
+        office: '',
+        inspector: '',
       });
       setIsAddDialogOpen(false);
-
       alert('Client added successfully!');
     } catch (error) {
       console.error('Unexpected error:', error);
@@ -174,46 +265,47 @@ const Clients = () => {
     }
   };
 
-  const handleEditClient = (client: Client) => {
-    setEditingClient(client);
-    setIsEditDialogOpen(true);
-  };
-
-  const handleUpdateCaseStatus = async () => {
-    if (!editingClient) return;
+  const handleSaveClient = async () => {
+    if (!selectedClient) return;
 
     try {
-      // Update the client's case status info in the database
-      // For now, we'll update the clients list locally
-      setClients(prevClients => 
-        prevClients.map(client => 
-          client.id === editingClient.id 
-            ? { ...client, caseStatus: editingClient.caseStatus, caseStatusInfo: editingClient.caseStatusInfo }
-            : client
+      const { error } = await supabase
+        .from('users')
+        .update({
+          first_name: selectedClient.firstName,
+          last_name: selectedClient.lastName,
+          email: selectedClient.email,
+        })
+        .eq('id', selectedClient.id);
+
+      if (error) throw error;
+
+      setClients(prevClients =>
+        prevClients.map(client =>
+          client.id === selectedClient.id ? selectedClient : client
         )
       );
-
-      setIsEditDialogOpen(false);
-      setEditingClient(null);
-      alert('Case status updated successfully!');
+      
+      setIsEditing(false);
+      alert('Client updated successfully!');
     } catch (error) {
-      console.error('Error updating case status:', error);
-      alert('Error updating case status. Please try again.');
+      console.error('Error updating client:', error);
+      alert('Error updating client. Please try again.');
     }
   };
 
-  const handleDeleteClient = async (clientId: number, clientName: string) => {
-    if (!confirm(`Are you sure you want to delete client "${clientName}"? This action cannot be undone.`)) {
+  const handleDeleteClient = async () => {
+    if (!selectedClient) return;
+    
+    if (!confirm(`Are you sure you want to delete client "${selectedClient.name}"? This action cannot be undone.`)) {
       return;
     }
 
     try {
-      console.log('Deleting client:', clientId);
-      
       const { error } = await supabase
         .from('users')
         .delete()
-        .eq('id', clientId);
+        .eq('id', selectedClient.id);
 
       if (error) {
         console.error('Database error:', error);
@@ -221,11 +313,8 @@ const Clients = () => {
         return;
       }
 
-      console.log('Client deleted successfully');
-
-      // Remove client from local state
-      setClients(prevClients => prevClients.filter(client => client.id !== clientId));
-
+      setClients(prevClients => prevClients.filter(client => client.id !== selectedClient.id));
+      setSelectedClient(null);
       alert('Client deleted successfully!');
     } catch (error) {
       console.error('Unexpected error:', error);
@@ -233,101 +322,16 @@ const Clients = () => {
     }
   };
 
-  if (selectedClient) {
-    return (
-      <div className="p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-primary">Client Profile</h1>
-            <p className="text-muted-foreground">Detailed view of client information</p>
-          </div>
-          <Button variant="outline" onClick={() => setSelectedClient(null)}>
-            Back to Clients
-          </Button>
-        </div>
+  const handleExport = () => {
+    alert('Export functionality would generate CSV/Excel file of filtered clients');
+  };
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Personal Details */}
-          <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle className="text-primary">Personal Details</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Name</p>
-                <p className="text-lg font-semibold">{selectedClient.name}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Email</p>
-                <p>{selectedClient.email}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Phone</p>
-                <p>{selectedClient.phone}</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Case Details */}
-          <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle className="text-primary">Case Details</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Status</p>
-                <div className="mt-1">{getStatusBadge(selectedClient.caseStatus)}</div>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Deadline</p>
-                <p>March 15, 2025</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Case ID</p>
-                <p>{selectedClient.case_id || 'No case assigned'}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">User Role</p>
-                <p className="capitalize">{selectedClient.role || 'Client'}</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Uploaded Documents */}
-          <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle className="text-primary">Uploaded Documents</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8 text-muted-foreground">
-                <p>No documents uploaded yet.</p>
-                <p className="text-sm">Documents will appear here once uploaded.</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Communication Log */}
-          <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle className="text-primary">Communication Log</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="p-3 bg-muted rounded-lg">
-                  <p className="text-sm font-medium">Initial consultation completed</p>
-                  <p className="text-xs text-muted-foreground">January 15, 2025</p>
-                </div>
-                <div className="p-3 bg-muted rounded-lg">
-                  <p className="text-sm font-medium">Document checklist sent to client</p>
-                  <p className="text-xs text-muted-foreground">January 20, 2025</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
+  const clearFilters = () => {
+    setSearchQuery('');
+    setDecisionFilter('all');
+    setOfficeFilter('all');
+    setInspectorFilter('all');
+  };
 
   if (isLoading) {
     return (
@@ -339,299 +343,483 @@ const Clients = () => {
     );
   }
 
+  // Client Detail View
+  if (selectedClient) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Button variant="ghost" size="sm" onClick={() => setSelectedClient(null)}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Clients
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold">{selectedClient.name}</h1>
+              <p className="text-muted-foreground">Case {selectedClient.caseNumber}</p>
+            </div>
+          </div>
+          <div className="flex space-x-2">
+            {isEditing ? (
+              <>
+                <Button variant="outline" onClick={() => setIsEditing(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveClient}>
+                  <Save className="w-4 h-4 mr-2" />
+                  Save
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => setIsEditing(true)}>
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit
+                </Button>
+                <Button variant="destructive" onClick={handleDeleteClient}>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Client
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Personal Info Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Personal Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Name</Label>
+                  {isEditing ? (
+                    <Input
+                      value={selectedClient.name}
+                      onChange={(e) => setSelectedClient(prev => prev ? {...prev, name: e.target.value} : null)}
+                    />
+                  ) : (
+                    <p className="font-medium">{selectedClient.name}</p>
+                  )}
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Date of Birth (Data Urodzenia)</Label>
+                  {isEditing ? (
+                    <Input
+                      type="date"
+                      value={selectedClient.dateOfBirth}
+                      onChange={(e) => setSelectedClient(prev => prev ? {...prev, dateOfBirth: e.target.value} : null)}
+                    />
+                  ) : (
+                    <p>{selectedClient.dateOfBirth}</p>
+                  )}
+                </div>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Postal Code (Numer Pocztowy)</Label>
+                {isEditing ? (
+                  <Input
+                    value={selectedClient.postalCode}
+                    onChange={(e) => setSelectedClient(prev => prev ? {...prev, postalCode: e.target.value} : null)}
+                  />
+                ) : (
+                  <p>{selectedClient.postalCode}</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Case Info Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Case Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Case Number</Label>
+                  <p className="font-medium">{selectedClient.caseNumber}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Application Type (Wniosek)</Label>
+                  <p>{selectedClient.applicationType}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Type of Stay (Pobyt)</Label>
+                  <p>{selectedClient.typeOfStay}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Office (Urząd)</Label>
+                  <p>{selectedClient.office}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Inspector</Label>
+                  <p>{selectedClient.inspector}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Review Date (Data Rozpatrzenia)</Label>
+                  <p>{selectedClient.reviewDate}</p>
+                </div>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Biometrics Date (Data Odcisków)</Label>
+                <p>{selectedClient.biometricsDate}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Status Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Status</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Decision (Decyzja)</Label>
+                <div className="mt-1">{getDecisionBadge(selectedClient.decision)}</div>
+              </div>
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Appeal (Odwołanie)</Label>
+                <Switch
+                  checked={selectedClient.appeal}
+                  onCheckedChange={(checked) => setSelectedClient(prev => prev ? {...prev, appeal: checked} : null)}
+                  disabled={!isEditing}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Expedite Request (Uskorenen)</Label>
+                <Switch
+                  checked={selectedClient.expediteRequest}
+                  onCheckedChange={(checked) => setSelectedClient(prev => prev ? {...prev, expediteRequest: checked} : null)}
+                  disabled={!isEditing}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Payments Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Payments</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Payment Status (Wpłacono)</Label>
+                <div className="mt-1">{getPaymentBadge(selectedClient.paymentStatus)}</div>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Amount</Label>
+                {isEditing ? (
+                  <Input
+                    value={selectedClient.paymentAmount || ''}
+                    onChange={(e) => setSelectedClient(prev => prev ? {...prev, paymentAmount: e.target.value} : null)}
+                  />
+                ) : (
+                  <p>{selectedClient.paymentAmount}</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Notes Card */}
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle>Notes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isEditing ? (
+                <Textarea
+                  value={selectedClient.notes}
+                  onChange={(e) => setSelectedClient(prev => prev ? {...prev, notes: e.target.value} : null)}
+                  rows={4}
+                  placeholder="Add notes about this client..."
+                />
+              ) : (
+                <p className="text-sm">{selectedClient.notes || 'No notes available.'}</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-primary">Clients</h1>
+          <h1 className="text-3xl font-bold">Clients</h1>
           <p className="text-muted-foreground">Manage your client cases and information</p>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-gradient-primary hover:opacity-90">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Client
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Add New Client</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="first_name">First Name *</Label>
-                  <Input
-                    id="first_name"
-                    placeholder="Enter first name..."
-                    value={newClient.first_name}
-                    onChange={(e) => setNewClient(prev => ({ ...prev, first_name: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="last_name">Last Name *</Label>
-                  <Input
-                    id="last_name"
-                    placeholder="Enter last name..."
-                    value={newClient.last_name}
-                    onChange={(e) => setNewClient(prev => ({ ...prev, last_name: e.target.value }))}
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <Label htmlFor="email">Email *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="Enter email address..."
-                  value={newClient.email}
-                  onChange={(e) => setNewClient(prev => ({ ...prev, email: e.target.value }))}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="phone">Phone (Optional)</Label>
-                  <Input
-                    id="phone"
-                    placeholder="Enter phone number..."
-                    value={newClient.phone}
-                    onChange={(e) => setNewClient(prev => ({ ...prev, phone: e.target.value }))}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="role">Role</Label>
-                  <Select 
-                    value={newClient.role} 
-                    onValueChange={(value: 'client' | 'lawyer') => setNewClient(prev => ({ ...prev, role: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="client">Client</SelectItem>
-                      <SelectItem value="lawyer">Lawyer</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="caseStatus">Case Status</Label>
-                  <Select 
-                    value={newClient.caseStatus} 
-                    onValueChange={(value: 'pending' | 'in-progress' | 'approved' | 'rejected') => 
-                      setNewClient(prev => ({ ...prev, caseStatus: value }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select case status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="in-progress">In Progress</SelectItem>
-                      <SelectItem value="approved">Approved</SelectItem>
-                      <SelectItem value="rejected">Rejected</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="caseStatusInfo">Case Status Information (Max 100 characters)</Label>
-                <Textarea
-                  id="caseStatusInfo"
-                  placeholder="Enter case status details..."
-                  value={newClient.caseStatusInfo}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (value.length <= 100) {
-                      setNewClient(prev => ({ ...prev, caseStatusInfo: value }));
-                    }
-                  }}
-                  className="resize-none"
-                  rows={3}
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  {newClient.caseStatusInfo.length}/100 characters
-                </p>
-              </div>
-
-              <div className="flex justify-end space-x-2 pt-4">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setIsAddDialogOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={handleAddClient}
-                  disabled={!newClient.first_name.trim() || !newClient.last_name.trim() || !newClient.email.trim()}
-                  className="bg-gradient-primary hover:opacity-90"
-                >
-                  Add Client
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* Edit Client Dialog */}
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Edit Case Status</DialogTitle>
-            </DialogHeader>
-            {editingClient && (
+        <div className="flex space-x-2">
+          <Button variant="outline" onClick={handleExport}>
+            <Download className="w-4 h-4 mr-2" />
+            Export
+          </Button>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Client
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Add New Client</DialogTitle>
+              </DialogHeader>
               <div className="space-y-4">
-                <div>
-                  <p className="font-medium">{editingClient.name}</p>
-                  <p className="text-sm text-muted-foreground">{editingClient.email}</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="firstName">First Name *</Label>
+                    <Input
+                      id="firstName"
+                      placeholder="Enter first name..."
+                      value={newClient.firstName}
+                      onChange={(e) => setNewClient(prev => ({ ...prev, firstName: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="lastName">Last Name *</Label>
+                    <Input
+                      id="lastName"
+                      placeholder="Enter last name..."
+                      value={newClient.lastName}
+                      onChange={(e) => setNewClient(prev => ({ ...prev, lastName: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="email">Email *</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="Enter email address..."
+                      value={newClient.email}
+                      onChange={(e) => setNewClient(prev => ({ ...prev, email: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="phone">Phone</Label>
+                    <Input
+                      id="phone"
+                      placeholder="Enter phone number..."
+                      value={newClient.phone}
+                      onChange={(e) => setNewClient(prev => ({ ...prev, phone: e.target.value }))}
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <Label htmlFor="editCaseStatus">Case Status</Label>
-                  <Select 
-                    value={editingClient.caseStatus} 
-                    onValueChange={(value: 'pending' | 'in-progress' | 'approved' | 'rejected') => 
-                      setEditingClient(prev => prev ? { ...prev, caseStatus: value } : null)
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select case status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="in-progress">In Progress</SelectItem>
-                      <SelectItem value="approved">Approved</SelectItem>
-                      <SelectItem value="rejected">Rejected</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="dateOfBirth">Date of Birth</Label>
+                    <Input
+                      id="dateOfBirth"
+                      type="date"
+                      value={newClient.dateOfBirth}
+                      onChange={(e) => setNewClient(prev => ({ ...prev, dateOfBirth: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="postalCode">Postal Code</Label>
+                    <Input
+                      id="postalCode"
+                      placeholder="Enter postal code..."
+                      value={newClient.postalCode}
+                      onChange={(e) => setNewClient(prev => ({ ...prev, postalCode: e.target.value }))}
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <Label htmlFor="editCaseStatusInfo">Case Status Information (Max 100 characters)</Label>
-                  <Textarea
-                    id="editCaseStatusInfo"
-                    placeholder="Enter case status details..."
-                    value={editingClient.caseStatusInfo || ''}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      if (value.length <= 100) {
-                        setEditingClient(prev => prev ? { ...prev, caseStatusInfo: value } : null);
-                      }
-                    }}
-                    className="resize-none"
-                    rows={3}
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {(editingClient.caseStatusInfo || '').length}/100 characters
-                  </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="applicationType">Application Type</Label>
+                    <Select value={newClient.applicationType} onValueChange={(value) => setNewClient(prev => ({ ...prev, applicationType: value }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select application type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Temporary Residence">Temporary Residence</SelectItem>
+                        <SelectItem value="Permanent Residence">Permanent Residence</SelectItem>
+                        <SelectItem value="Work Permit">Work Permit</SelectItem>
+                        <SelectItem value="EU Blue Card">EU Blue Card</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="typeOfStay">Type of Stay</Label>
+                    <Select value={newClient.typeOfStay} onValueChange={(value) => setNewClient(prev => ({ ...prev, typeOfStay: value }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select type of stay" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Work Permit">Work Permit</SelectItem>
+                        <SelectItem value="Student Visa">Student Visa</SelectItem>
+                        <SelectItem value="Family Reunification">Family Reunification</SelectItem>
+                        <SelectItem value="Business">Business</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="office">Office</Label>
+                    <Select value={newClient.office} onValueChange={(value) => setNewClient(prev => ({ ...prev, office: value }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select office" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Warsaw Office">Warsaw Office</SelectItem>
+                        <SelectItem value="Krakow Office">Krakow Office</SelectItem>
+                        <SelectItem value="Gdansk Office">Gdansk Office</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="inspector">Inspector</Label>
+                    <Select value={newClient.inspector} onValueChange={(value) => setNewClient(prev => ({ ...prev, inspector: value }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select inspector" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Jan Kowalski">Jan Kowalski</SelectItem>
+                        <SelectItem value="Anna Nowak">Anna Nowak</SelectItem>
+                        <SelectItem value="Piotr Zielinski">Piotr Zielinski</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 <div className="flex justify-end space-x-2 pt-4">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setIsEditDialogOpen(false)}
-                  >
+                  <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
                     Cancel
                   </Button>
                   <Button 
-                    onClick={handleUpdateCaseStatus}
-                    className="bg-gradient-primary hover:opacity-90"
+                    onClick={handleAddClient}
+                    disabled={!newClient.firstName.trim() || !newClient.lastName.trim() || !newClient.email.trim()}
                   >
-                    Update Status
+                    Add Client
                   </Button>
                 </div>
               </div>
-            )}
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
-      {/* Clients Table */}
-      <Card className="shadow-card">
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="border-b bg-muted/30">
-                <tr>
-                  <th className="text-left p-4 font-semibold text-primary">Name</th>
-                  <th className="text-left p-4 font-semibold text-primary">Case Status</th>
-                  <th className="text-left p-4 font-semibold text-primary">Contact Info</th>
-                  <th className="text-left p-4 font-semibold text-primary">Last Activity</th>
-                  <th className="text-left p-4 font-semibold text-primary">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {clients.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="p-8 text-center text-muted-foreground">
-                      No clients found
-                    </td>
-                  </tr>
-                ) : (
-                  clients.map((client) => (
-                    <tr key={client.id} className="border-b hover:bg-muted/20 transition-colors">
-                      <td className="p-4">
-                        <div className="font-medium">{client.name}</div>
-                      </td>
-                      <td className="p-4">
-                        <div className="space-y-1">
-                          {getStatusBadge(client.caseStatus)}
-                          {client.caseStatusInfo && (
-                            <p className="text-xs text-muted-foreground max-w-xs truncate">
-                              {client.caseStatusInfo}
-                            </p>
-                          )}
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="space-y-1">
-                          <div className="text-sm">{client.email}</div>
-                          <div className="text-sm text-muted-foreground">{client.phone}</div>
-                        </div>
-                      </td>
-                      <td className="p-4 text-muted-foreground">{client.lastActivity}</td>
-                      <td className="p-4">
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setSelectedClient(client)}
-                          >
-                            <Eye className="w-4 h-4 mr-2" />
-                            View
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleEditClient(client)}
-                          >
-                            <Edit className="w-4 h-4 mr-2" />
-                            Edit Status
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-destructive hover:text-destructive"
-                            onClick={() => handleDeleteClient(client.id, client.name)}
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Delete
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+      {/* Search and Filters */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-col lg:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                <Input
+                  placeholder="Search by name or case number..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            
+            <div className="flex gap-2">
+              <Select value={decisionFilter} onValueChange={setDecisionFilter}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Decision" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Decisions</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="positive">Positive</SelectItem>
+                  <SelectItem value="negative">Negative</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={officeFilter} onValueChange={setOfficeFilter}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Office" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Offices</SelectItem>
+                  <SelectItem value="Warsaw Office">Warsaw</SelectItem>
+                  <SelectItem value="Krakow Office">Krakow</SelectItem>
+                  <SelectItem value="Gdansk Office">Gdansk</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={inspectorFilter} onValueChange={setInspectorFilter}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Inspector" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Inspectors</SelectItem>
+                  <SelectItem value="Jan Kowalski">Jan Kowalski</SelectItem>
+                  <SelectItem value="Anna Nowak">Anna Nowak</SelectItem>
+                  <SelectItem value="Piotr Zielinski">Piotr Zielinski</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Button variant="outline" onClick={clearFilters}>
+                <Filter className="w-4 h-4 mr-2" />
+                Clear
+              </Button>
+            </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Clients Table */}
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name (Imię + Nazwisko)</TableHead>
+                <TableHead>Case Number</TableHead>
+                <TableHead>Application Type (Wniosek)</TableHead>
+                <TableHead>Type of Stay (Pobyt)</TableHead>
+                <TableHead>Office (Urząd)</TableHead>
+                <TableHead>Inspector</TableHead>
+                <TableHead>Biometrics Date (Data Odcisków)</TableHead>
+                <TableHead>Decision (Decyzja)</TableHead>
+                <TableHead>Payment Status (Wpłacono)</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredClients.map((client) => (
+                <TableRow
+                  key={client.id}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => setSelectedClient(client)}
+                >
+                  <TableCell className="font-medium">{client.name}</TableCell>
+                  <TableCell>{client.caseNumber}</TableCell>
+                  <TableCell>{client.applicationType}</TableCell>
+                  <TableCell>{client.typeOfStay}</TableCell>
+                  <TableCell>{client.office}</TableCell>
+                  <TableCell>{client.inspector}</TableCell>
+                  <TableCell>{client.biometricsDate}</TableCell>
+                  <TableCell>{getDecisionBadge(client.decision)}</TableCell>
+                  <TableCell>{getPaymentBadge(client.paymentStatus)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          
+          {filteredClients.length === 0 && (
+            <div className="text-center py-8 text-muted-foreground">
+              <p>No clients found matching your criteria.</p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
