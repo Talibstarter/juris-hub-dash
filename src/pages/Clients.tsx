@@ -24,7 +24,7 @@ interface Client {
   inspector: string;
   biometricsDate: string;
   decision: 'pending' | 'positive' | 'negative';
-  paymentStatus: 'paid' | 'unpaid' | 'partial';
+  paymentStatus: 'paid' | 'unpaid' | 'partial' | 'no';
   email: string;
   phone: string;
   dateOfBirth: string;
@@ -60,18 +60,20 @@ const getPaymentBadge = (status: Client['paymentStatus']) => {
   const variants = {
     paid: 'bg-green-100 text-green-800 border-green-300',
     unpaid: 'bg-red-100 text-red-800 border-red-300',
-    partial: 'bg-yellow-100 text-yellow-800 border-yellow-300'
+    partial: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+    no: 'bg-gray-100 text-gray-800 border-gray-300'
   };
   
   const labels = {
     paid: 'Paid',
     unpaid: 'Unpaid',
-    partial: 'Partial'
+    partial: 'Partial',
+    no: 'No Payment'
   };
 
   return (
-    <Badge variant="outline" className={variants[status]}>
-      {labels[status]}
+    <Badge variant="outline" className={variants[status as keyof typeof variants] || variants.no}>
+      {labels[status as keyof typeof labels] || labels.no}
     </Badge>
   );
 };
@@ -116,26 +118,26 @@ const Clients = () => {
 
         const formattedClients = data?.map(caseData => ({
           id: caseData.id,
-          name: caseData.client_name || 'Unknown Client',
-          firstName: caseData.client_name?.split(' ')[0] || 'Unknown',
-          lastName: caseData.client_name?.split(' ').slice(1).join(' ') || 'Client',
+          name: caseData.client_name || 'N/A',
+          firstName: caseData.client_name?.split(' ')[0] || '',
+          lastName: caseData.client_name?.split(' ').slice(1).join(' ') || '',
           caseNumber: caseData.public_case_id || `CASE-${caseData.id}`,
-          applicationType: caseData.application_type || 'Temporary Residence',
-          typeOfStay: caseData.type_of_stay || 'Work Permit',
-          office: caseData.office || 'Warsaw Office',
-          inspector: caseData.inspector || 'Jan Kowalski',
-          biometricsDate: caseData.biometrics_date || '2025-02-15',
+          applicationType: caseData.application_type || 'N/A',
+          typeOfStay: caseData.type_of_stay || 'N/A',
+          office: caseData.office || 'N/A',
+          inspector: caseData.inspector || 'N/A',
+          biometricsDate: caseData.biometrics_date || 'N/A',
           decision: (caseData.decision || 'pending') as Client['decision'],
-          paymentStatus: (caseData.payment_status || 'unpaid') as Client['paymentStatus'],
+          paymentStatus: (caseData.payment_status || 'no') as Client['paymentStatus'],
           email: 'N/A',
           phone: caseData.phone_e164 || 'N/A',
-          dateOfBirth: caseData.date_of_birth || '1990-01-01',
-          postalCode: caseData.postal_code || '00-001',
-          reviewDate: caseData.review_date || '2025-03-01',
+          dateOfBirth: caseData.date_of_birth || 'N/A',
+          postalCode: caseData.postal_code || 'N/A',
+          reviewDate: caseData.review_date || 'N/A',
           appeal: caseData.appeal || false,
           expediteRequest: caseData.expedite_request || false,
-          paymentAmount: caseData.payment_amount ? `${caseData.payment_amount} PLN` : '1500 PLN',
-          notes: caseData.notes || 'Initial consultation completed. Awaiting document review.'
+          paymentAmount: caseData.payment_amount ? `${caseData.payment_amount} PLN` : 'N/A',
+          notes: caseData.notes || ''
         })) || [];
 
         setClients(formattedClients);
@@ -195,15 +197,15 @@ const Clients = () => {
         .insert([{
           client_name: `${newClient.firstName.trim()} ${newClient.lastName.trim()}`,
           public_case_id: `CASE-${Date.now()}`,
-          application_type: newClient.applicationType || 'Temporary Residence',
-          type_of_stay: newClient.typeOfStay || 'Work Permit',
-          office: newClient.office || 'Warsaw Office',
-          inspector: newClient.inspector || 'Jan Kowalski',
+          application_type: newClient.applicationType || null,
+          type_of_stay: newClient.typeOfStay || null,
+          office: newClient.office || null,
+          inspector: newClient.inspector || null,
           date_of_birth: newClient.dateOfBirth || null,
           postal_code: newClient.postalCode || null,
           phone_e164: newClient.phone || null,
           decision: 'pending',
-          payment_status: 'unpaid',
+          payment_status: 'no',
           appeal: false,
           expedite_request: false,
           status: 'new',
@@ -225,21 +227,21 @@ const Clients = () => {
         firstName: data.client_name.split(' ')[0],
         lastName: data.client_name.split(' ').slice(1).join(' '),
         caseNumber: data.public_case_id,
-        applicationType: data.application_type,
-        typeOfStay: data.type_of_stay,
-        office: data.office,
-        inspector: data.inspector,
-        biometricsDate: data.biometrics_date || '2025-02-15',
+        applicationType: data.application_type || 'N/A',
+        typeOfStay: data.type_of_stay || 'N/A',
+        office: data.office || 'N/A',
+        inspector: data.inspector || 'N/A',
+        biometricsDate: data.biometrics_date || 'N/A',
         decision: data.decision as Client['decision'],
         paymentStatus: data.payment_status as Client['paymentStatus'],
         email: newClient.email,
-        phone: data.phone_e164 || newClient.phone,
-        dateOfBirth: data.date_of_birth || newClient.dateOfBirth,
-        postalCode: data.postal_code || newClient.postalCode,
-        reviewDate: data.review_date || '2025-03-01',
+        phone: data.phone_e164 || newClient.phone || 'N/A',
+        dateOfBirth: data.date_of_birth || newClient.dateOfBirth || 'N/A',
+        postalCode: data.postal_code || newClient.postalCode || 'N/A',
+        reviewDate: data.review_date || 'N/A',
         appeal: data.appeal,
         expediteRequest: data.expedite_request,
-        paymentAmount: data.payment_amount ? `${data.payment_amount} PLN` : '1500 PLN',
+        paymentAmount: data.payment_amount ? `${data.payment_amount} PLN` : 'N/A',
         notes: data.notes || ''
       };
 
