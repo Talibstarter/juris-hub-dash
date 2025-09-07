@@ -80,6 +80,7 @@ const getPaymentBadge = (status: Client['paymentStatus']) => {
 
 const Clients = () => {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [originalClient, setOriginalClient] = useState<Client | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
   const [filteredClients, setFilteredClients] = useState<Client[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -328,29 +329,77 @@ const Clients = () => {
     }
   };
 
+  const getChangedFields = (original: Client, current: Client) => {
+    const changes: any = {};
+    
+    // Map client fields to database column names and compare
+    const fieldMappings = {
+      name: 'client_name',
+      applicationType: 'application_type',
+      typeOfStay: 'type_of_stay',
+      office: 'office',
+      inspector: 'inspector',
+      biometricsDate: 'biometrics_date',
+      decision: 'decision',
+      paymentStatus: 'payment_status',
+      reviewDate: 'review_date',
+      appeal: 'appeal',
+      expediteRequest: 'expedite_request',
+      dateOfBirth: 'date_of_birth',
+      postalCode: 'postal_code',
+      notes: 'notes'
+    };
+
+    // Check each field for changes
+    Object.entries(fieldMappings).forEach(([clientField, dbField]) => {
+      const originalValue = original[clientField as keyof Client];
+      const currentValue = current[clientField as keyof Client];
+      
+      if (originalValue !== currentValue) {
+        if (clientField === 'paymentAmount') {
+          // Handle payment amount conversion
+          const originalAmount = originalValue === 'N/A' ? null : parseFloat(String(originalValue).replace(' PLN', ''));
+          const currentAmount = currentValue === 'N/A' ? null : parseFloat(String(currentValue).replace(' PLN', ''));
+          if (originalAmount !== currentAmount) {
+            changes.payment_amount = currentAmount;
+          }
+        } else {
+          // Handle null/N/A values
+          const dbValue = currentValue === 'N/A' ? null : currentValue;
+          changes[dbField] = dbValue;
+        }
+      }
+    });
+
+    // Special handling for payment amount
+    if (original.paymentAmount !== current.paymentAmount) {
+      const currentAmount = current.paymentAmount === 'N/A' ? null : parseFloat(String(current.paymentAmount).replace(' PLN', ''));
+      changes.payment_amount = currentAmount;
+    }
+
+    return changes;
+  };
+
   const handleSaveClient = async () => {
-    if (!selectedClient) return;
+    if (!selectedClient || !originalClient) return;
 
     try {
+      // Get only the changed fields
+      const changedFields = getChangedFields(originalClient, selectedClient);
+      
+      // If no fields changed, just exit edit mode
+      if (Object.keys(changedFields).length === 0) {
+        setIsEditing(false);
+        setOriginalClient(null);
+        alert('No changes to save.');
+        return;
+      }
+
+      console.log('Updating only changed fields:', changedFields);
+
       const { error } = await supabase
         .from('cases')
-        .update({
-          client_name: selectedClient.name,
-          application_type: selectedClient.applicationType,
-          type_of_stay: selectedClient.typeOfStay,
-          office: selectedClient.office,
-          inspector: selectedClient.inspector,
-          biometrics_date: selectedClient.biometricsDate,
-          decision: selectedClient.decision,
-          payment_status: selectedClient.paymentStatus,
-          payment_amount: selectedClient.paymentAmount ? parseFloat(selectedClient.paymentAmount.replace(' PLN', '')) : null,
-          review_date: selectedClient.reviewDate,
-          appeal: selectedClient.appeal,
-          expedite_request: selectedClient.expediteRequest,
-          date_of_birth: selectedClient.dateOfBirth,
-          postal_code: selectedClient.postalCode,
-          notes: selectedClient.notes
-        })
+        .update(changedFields)
         .eq('id', selectedClient.id);
 
       if (error) throw error;
@@ -359,7 +408,8 @@ const Clients = () => {
       await refreshClients();
       
       setIsEditing(false);
-      alert('Client updated successfully!');
+      setOriginalClient(null);
+      alert(`Client updated successfully! Updated ${Object.keys(changedFields).length} field(s).`);
     } catch (error) {
       console.error('Error updating client:', error);
       alert('Error updating client. Please try again.');
@@ -433,17 +483,28 @@ const Clients = () => {
           <div className="flex space-x-2">
             {isEditing ? (
               <>
-                <Button variant="outline" onClick={() => setIsEditing(false)}>
+                <Button variant="outline" onClick={() => {
+                  setIsEditing(false);
+                  setOriginalClient(null);
+                  // Reset to original data
+                  if (originalClient) {
+                    setSelectedClient(originalClient);
+                  }
+                }}>
                   Cancel
                 </Button>
                 <Button onClick={handleSaveClient}>
                   <Save className="w-4 h-4 mr-2" />
-                  Save
+                  Save Changes
                 </Button>
               </>
             ) : (
               <>
-                <Button variant="outline" onClick={() => setIsEditing(true)}>
+                <Button variant="outline" onClick={() => {
+                  setIsEditing(true);
+                  // Store original data when editing starts
+                  setOriginalClient(selectedClient ? {...selectedClient} : null);
+                }}>
                   <Edit className="w-4 h-4 mr-2" />
                   Edit
                 </Button>
