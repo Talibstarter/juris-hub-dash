@@ -154,6 +154,17 @@ const Clients = () => {
     fetchClients();
   }, []);
 
+  // Add refresh button functionality
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!isEditing) {
+        refreshClients();
+      }
+    }, 30000); // Refresh every 30 seconds when not editing
+
+    return () => clearInterval(interval);
+  }, [isEditing]);
+
   // Filter and search effect
   useEffect(() => {
     let filtered = clients;
@@ -266,6 +277,57 @@ const Clients = () => {
     }
   };
 
+  const refreshClients = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('cases')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const formattedClients = data?.map(caseData => ({
+        id: caseData.id,
+        name: caseData.client_name || 'N/A',
+        firstName: caseData.client_name?.split(' ')[0] || '',
+        lastName: caseData.client_name?.split(' ').slice(1).join(' ') || '',
+        caseNumber: caseData.public_case_id || `CASE-${caseData.id}`,
+        applicationType: caseData.application_type || 'N/A',
+        typeOfStay: caseData.type_of_stay || 'N/A',
+        office: caseData.office || 'N/A',
+        inspector: caseData.inspector || 'N/A',
+        biometricsDate: caseData.biometrics_date || 'N/A',
+        decision: (caseData.decision || 'pending') as Client['decision'],
+        paymentStatus: (caseData.payment_status || 'no') as Client['paymentStatus'],
+        email: 'N/A',
+        phone: caseData.phone_e164 || 'N/A',
+        dateOfBirth: caseData.date_of_birth || 'N/A',
+        postalCode: caseData.postal_code || 'N/A',
+        reviewDate: caseData.review_date || 'N/A',
+        appeal: caseData.appeal || false,
+        expediteRequest: caseData.expedite_request || false,
+        paymentAmount: caseData.payment_amount ? `${caseData.payment_amount} PLN` : 'N/A',
+        notes: caseData.notes || ''
+      })) || [];
+
+      setClients(formattedClients);
+      setFilteredClients(formattedClients);
+
+      // Update selected client if it exists
+      if (selectedClient) {
+        const updatedSelectedClient = formattedClients.find(client => client.id === selectedClient.id);
+        if (updatedSelectedClient) {
+          setSelectedClient(updatedSelectedClient);
+        }
+      }
+    } catch (error) {
+      console.error('Error refreshing clients:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSaveClient = async () => {
     if (!selectedClient) return;
 
@@ -293,11 +355,8 @@ const Clients = () => {
 
       if (error) throw error;
 
-      setClients(prevClients =>
-        prevClients.map(client =>
-          client.id === selectedClient.id ? selectedClient : client
-        )
-      );
+      // Refresh data from database to ensure synchronization
+      await refreshClients();
       
       setIsEditing(false);
       alert('Client updated successfully!');
@@ -494,7 +553,23 @@ const Clients = () => {
             <CardContent className="space-y-4">
               <div>
                 <Label className="text-sm font-medium text-muted-foreground">Decision (Decyzja)</Label>
-                <div className="mt-1">{getDecisionBadge(selectedClient.decision)}</div>
+                {isEditing ? (
+                  <Select 
+                    value={selectedClient.decision} 
+                    onValueChange={(value: Client['decision']) => setSelectedClient(prev => prev ? {...prev, decision: value} : null)}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="positive">Positive</SelectItem>
+                      <SelectItem value="negative">Negative</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="mt-1">{getDecisionBadge(selectedClient.decision)}</div>
+                )}
               </div>
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-medium">Appeal (Odwołanie)</Label>
@@ -523,7 +598,24 @@ const Clients = () => {
             <CardContent className="space-y-4">
               <div>
                 <Label className="text-sm font-medium text-muted-foreground">Payment Status (Wpłacono)</Label>
-                <div className="mt-1">{getPaymentBadge(selectedClient.paymentStatus)}</div>
+                {isEditing ? (
+                  <Select 
+                    value={selectedClient.paymentStatus} 
+                    onValueChange={(value: Client['paymentStatus']) => setSelectedClient(prev => prev ? {...prev, paymentStatus: value} : null)}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="no">No Payment</SelectItem>
+                      <SelectItem value="unpaid">Unpaid</SelectItem>
+                      <SelectItem value="partial">Partial</SelectItem>
+                      <SelectItem value="paid">Paid</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="mt-1">{getPaymentBadge(selectedClient.paymentStatus)}</div>
+                )}
               </div>
               <div>
                 <Label className="text-sm font-medium text-muted-foreground">Amount</Label>
