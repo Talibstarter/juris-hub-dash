@@ -100,6 +100,7 @@ const Clients = () => {
     email: '',
     phone: '',
     telegramUsername: '',
+    telegramNumber: '',
     dateOfBirth: '',
     postalCode: '',
     applicationType: '',
@@ -265,6 +266,7 @@ const Clients = () => {
         email: '',
         phone: '',
         telegramUsername: '',
+        telegramNumber: '',
         dateOfBirth: '',
         postalCode: '',
         applicationType: '',
@@ -795,7 +797,15 @@ const Clients = () => {
                       onChange={(e) => setNewClient(prev => ({ ...prev, telegramUsername: e.target.value }))}
                     />
                   </div>
-                  <div></div>
+                  <div>
+                    <Label htmlFor="telegramNumber">Telegram Number (Optional)</Label>
+                    <Input
+                      id="telegramNumber"
+                      placeholder="Enter telegram number..."
+                      value={newClient.telegramNumber}
+                      onChange={(e) => setNewClient(prev => ({ ...prev, telegramNumber: e.target.value }))}
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
