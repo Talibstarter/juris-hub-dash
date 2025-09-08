@@ -34,6 +34,8 @@ interface Client {
   expediteRequest: boolean;
   paymentAmount?: string;
   notes: string;
+  telegramUsername?: string;
+  telegramNumber?: string;
 }
 
 const getDecisionBadge = (decision: Client['decision']) => {
@@ -218,6 +220,8 @@ const Clients = () => {
           date_of_birth: newClient.dateOfBirth || null,
           postal_code: newClient.postalCode || null,
           phone_e164: newClient.phone || null,
+          username: newClient.telegramUsername || null,
+          telegram_number: newClient.telegramNumber || null,
           decision: 'pending',
           payment_status: 'no',
           appeal: false,
@@ -256,7 +260,9 @@ const Clients = () => {
         appeal: data.appeal,
         expediteRequest: data.expedite_request,
         paymentAmount: data.payment_amount ? `${data.payment_amount} PLN` : 'N/A',
-        notes: data.notes || ''
+        notes: data.notes || '',
+        telegramUsername: data.username || newClient.telegramUsername || '',
+        telegramNumber: data.telegram_number || newClient.telegramNumber || ''
       };
 
       setClients(prevClients => [formattedClient, ...prevClients]);
@@ -313,7 +319,9 @@ const Clients = () => {
         appeal: caseData.appeal || false,
         expediteRequest: caseData.expedite_request || false,
         paymentAmount: caseData.payment_amount ? `${caseData.payment_amount} PLN` : 'N/A',
-        notes: caseData.notes || ''
+        notes: caseData.notes || '',
+        telegramUsername: caseData.username || '',
+        telegramNumber: caseData.telegram_number || ''
       })) || [];
 
       setClients(formattedClients);
@@ -351,7 +359,9 @@ const Clients = () => {
       expediteRequest: 'expedite_request',
       dateOfBirth: 'date_of_birth',
       postalCode: 'postal_code',
-      notes: 'notes'
+      notes: 'notes',
+      telegramUsername: 'username',
+      telegramNumber: 'telegram_number'
     };
 
     // Check each field for changes
