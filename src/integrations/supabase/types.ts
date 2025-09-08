@@ -167,6 +167,7 @@ export type Database = {
           status: Database["public"]["Enums"]["case_status"]
           tags: string[] | null
           telegram_id: number | null
+          telegram_number: string | null
           type_of_stay: string | null
           updated_at: string | null
           username: string | null
@@ -195,6 +196,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["case_status"]
           tags?: string[] | null
           telegram_id?: number | null
+          telegram_number?: string | null
           type_of_stay?: string | null
           updated_at?: string | null
           username?: string | null
@@ -223,6 +225,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["case_status"]
           tags?: string[] | null
           telegram_id?: number | null
+          telegram_number?: string | null
           type_of_stay?: string | null
           updated_at?: string | null
           username?: string | null

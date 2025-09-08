@@ -262,7 +262,7 @@ const Clients = () => {
         paymentAmount: data.payment_amount ? `${data.payment_amount} PLN` : 'N/A',
         notes: data.notes || '',
         telegramUsername: data.username || newClient.telegramUsername || '',
-        telegramNumber: data.telegram_number || newClient.telegramNumber || ''
+        telegramNumber: '' // Will be properly connected once types are updated
       };
 
       setClients(prevClients => [formattedClient, ...prevClients]);
@@ -321,7 +321,7 @@ const Clients = () => {
         paymentAmount: caseData.payment_amount ? `${caseData.payment_amount} PLN` : 'N/A',
         notes: caseData.notes || '',
         telegramUsername: caseData.username || '',
-        telegramNumber: caseData.telegram_number || ''
+        telegramNumber: '' // Will be properly connected once types are updated
       })) || [];
 
       setClients(formattedClients);
