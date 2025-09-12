@@ -19,18 +19,8 @@ interface FAQItem {
   category?: string;
 }
 
-interface GroupedFAQ {
-  id: number;
-  question: string;
-  answer: string;
-  language: string;
-  category?: string;
-  translations: FAQItem[];
-}
-
 const FAQ = () => {
   const [faqs, setFaqs] = useState<FAQItem[]>([]);
-  const [groupedFaqs, setGroupedFaqs] = useState<GroupedFAQ[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [expandedFAQs, setExpandedFAQs] = useState<Set<number>>(new Set());
@@ -40,39 +30,6 @@ const FAQ = () => {
     language: 'en',
     category: ''
   });
-
-  // Group FAQs by similar content (basic approach - you can enhance this)
-  const groupFAQs = (faqs: FAQItem[]) => {
-    const grouped: GroupedFAQ[] = [];
-    const processed = new Set<number>();
-
-    faqs.forEach(faq => {
-      if (processed.has(faq.id)) return;
-
-      // Find related FAQs (for now, just group by similar questions or manual grouping)
-      const relatedFaqs = faqs.filter(f => 
-        f.id !== faq.id && 
-        !processed.has(f.id) &&
-        (f.question.toLowerCase().includes(faq.question.toLowerCase().split(' ')[0]) ||
-         faq.question.toLowerCase().includes(f.question.toLowerCase().split(' ')[0]))
-      );
-
-      const group: GroupedFAQ = {
-        id: faq.id,
-        question: faq.question,
-        answer: faq.answer,
-        language: faq.language,
-        category: faq.category,
-        translations: relatedFaqs
-      };
-
-      grouped.push(group);
-      processed.add(faq.id);
-      relatedFaqs.forEach(rf => processed.add(rf.id));
-    });
-
-    return grouped;
-  };
 
   useEffect(() => {
     const fetchFAQs = async () => {
@@ -94,36 +51,9 @@ const FAQ = () => {
             category: faq.category
           }));
           setFaqs(formattedFAQs);
-          
-          // Group FAQs and prioritize English as main entries
-          const englishFaqs = formattedFAQs.filter(f => f.language === 'en');
-          const nonEnglishFaqs = formattedFAQs.filter(f => f.language !== 'en');
-          
-          const grouped = englishFaqs.map(englishFaq => ({
-            ...englishFaq,
-            translations: nonEnglishFaqs.filter(nef => 
-              // Simple grouping - you can enhance this logic
-              nef.question.length > 0
-            )
-          }));
-
-          // Add non-English FAQs that don't have English counterparts
-          nonEnglishFaqs.forEach(nonEnglish => {
-            const hasEnglishCounterpart = grouped.some(g => 
-              g.translations.some(t => t.id === nonEnglish.id)
-            );
-            if (!hasEnglishCounterpart) {
-              grouped.push({
-                ...nonEnglish,
-                translations: []
-              });
-            }
-          });
-
-          setGroupedFaqs(grouped);
         } else {
           // Fallback data
-          const fallbackFaqs = [
+          setFaqs([
             {
               id: 1,
               question: 'How long does Karta Pobytu take?',
@@ -136,22 +66,18 @@ const FAQ = () => {
               answer: 'Passport, rental contract, employment contract, health insurance, and proof of income.',
               language: 'en'
             }
-          ];
-          setFaqs(fallbackFaqs);
-          setGroupedFaqs(fallbackFaqs.map(faq => ({ ...faq, translations: [] })));
+          ]);
         }
       } catch (error) {
         console.error('Error fetching FAQs:', error);
-        const fallbackFaqs = [
+        setFaqs([
           {
             id: 1,
             question: 'How long does Karta Pobytu take?',
             answer: 'Usually 6–12 months depending on the case complexity and current processing times.',
             language: 'en'
           }
-        ];
-        setFaqs(fallbackFaqs);
-        setGroupedFaqs(fallbackFaqs.map(faq => ({ ...faq, translations: [] })));
+        ]);
       } finally {
         setIsLoading(false);
       }
@@ -195,20 +121,6 @@ const FAQ = () => {
       };
 
       setFaqs(prevFaqs => [formattedFAQ, ...prevFaqs]);
-      
-      // Update grouped FAQs
-      if (formattedFAQ.language === 'en') {
-        setGroupedFaqs(prevGrouped => [
-          { ...formattedFAQ, translations: [] },
-          ...prevGrouped
-        ]);
-      } else {
-        // Add as translation or standalone
-        setGroupedFaqs(prevGrouped => [
-          { ...formattedFAQ, translations: [] },
-          ...prevGrouped
-        ]);
-      }
 
       setNewFAQ({
         question: '',
@@ -326,16 +238,15 @@ const FAQ = () => {
 
       {/* FAQ List */}
       <div className="space-y-4">
-        {groupedFaqs.length === 0 ? (
+        {faqs.length === 0 ? (
           <Card className="shadow-card">
             <CardContent className="p-8 text-center text-muted-foreground">
               No FAQs found
             </CardContent>
           </Card>
         ) : (
-          groupedFaqs.map((faq) => {
+          faqs.map((faq) => {
             const isExpanded = expandedFAQs.has(faq.id);
-            const hasTranslations = faq.translations.length > 0;
             
             return (
               <Card key={faq.id} className="shadow-card">
@@ -360,13 +271,13 @@ const FAQ = () => {
                             <Badge variant="outline" className="text-xs">
                               {faq.language === 'en' ? 'English' : faq.language === 'pl' ? 'Polish' : 'Russian'}
                             </Badge>
+                            {faq.category && (
+                              <Badge variant="secondary" className="text-xs">
+                                {faq.category}
+                              </Badge>
+                            )}
                           </div>
-                          <p className="text-muted-foreground">{faq.answer}</p>
-                          {hasTranslations && (
-                            <p className="text-xs text-muted-foreground mt-2">
-                              Click to view {faq.translations.length} translation{faq.translations.length > 1 ? 's' : ''}
-                            </p>
-                          )}
+                          <p className="text-xs text-muted-foreground">Click to view full answer</p>
                         </div>
                         <div className="flex items-center gap-2">
                           <Button size="sm" variant="outline" onClick={(e) => e.stopPropagation()}>
@@ -375,40 +286,20 @@ const FAQ = () => {
                           <Button size="sm" variant="outline" className="text-destructive hover:text-destructive" onClick={(e) => e.stopPropagation()}>
                             <Trash2 className="w-4 h-4" />
                           </Button>
-                          {hasTranslations && (
-                            isExpanded ? <ChevronDown className="w-5 h-5 text-muted-foreground" /> : <ChevronRight className="w-5 h-5 text-muted-foreground" />
-                          )}
+                          {isExpanded ? <ChevronDown className="w-5 h-5 text-muted-foreground" /> : <ChevronRight className="w-5 h-5 text-muted-foreground" />}
                         </div>
                       </div>
                     </div>
                   </CollapsibleTrigger>
                   
-                  {hasTranslations && (
-                    <CollapsibleContent>
-                      <div className="px-6 pb-6 border-t bg-muted/10">
-                        <h4 className="font-semibold text-sm text-muted-foreground mb-4 mt-4">Other Languages</h4>
-                        <div className="space-y-4">
-                          {faq.translations.map((translation, index) => (
-                            <div key={index} className="space-y-2">
-                              <div className="flex items-center gap-2">
-                                <Badge variant="outline" className="text-xs">
-                                  {translation.language === 'en' ? 'English' : 
-                                   translation.language === 'pl' ? 'Polish' : 
-                                   translation.language === 'ru' ? 'Russian' : translation.language}
-                                </Badge>
-                              </div>
-                              <div>
-                                <p className="font-medium text-primary">{translation.question}</p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground">{translation.answer}</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                  <CollapsibleContent>
+                    <div className="px-6 pb-6 border-t bg-muted/10">
+                      <div className="mt-4">
+                        <h4 className="font-semibold text-sm text-muted-foreground mb-2">Answer</h4>
+                        <p className="text-muted-foreground leading-relaxed">{faq.answer}</p>
                       </div>
-                    </CollapsibleContent>
-                  )}
+                    </div>
+                  </CollapsibleContent>
                 </Collapsible>
               </Card>
             );
