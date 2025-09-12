@@ -31,9 +31,13 @@ const FAQ = () => {
   const [newFAQ, setNewFAQ] = useState({
     question: '',
     answer: '',
-    language: 'en',
-    category: ''
+    question_pl: '',
+    answer_pl: '',
+    question_ru: '',
+    answer_ru: ''
   });
+  const [showPolish, setShowPolish] = useState(false);
+  const [showRussian, setShowRussian] = useState(false);
 
   useEffect(() => {
     const fetchFAQs = async () => {
@@ -106,8 +110,12 @@ const FAQ = () => {
         .insert([{
           question: newFAQ.question.trim(),
           answer: newFAQ.answer.trim(),
-          language: newFAQ.language,
-          category: newFAQ.category.trim() || null,
+          question_pl: newFAQ.question_pl.trim() || null,
+          answer_pl: newFAQ.answer_pl.trim() || null,
+          question_ru: newFAQ.question_ru.trim() || null,
+          answer_ru: newFAQ.answer_ru.trim() || null,
+          language: 'en',
+          category: null,
           is_published: true,
           author_id: null
         }])
@@ -137,9 +145,13 @@ const FAQ = () => {
       setNewFAQ({
         question: '',
         answer: '',
-        language: 'en',
-        category: ''
+        question_pl: '',
+        answer_pl: '',
+        question_ru: '',
+        answer_ru: ''
       });
+      setShowPolish(false);
+      setShowRussian(false);
       setIsAddDialogOpen(false);
       alert('FAQ added successfully!');
     } catch (error) {
@@ -199,34 +211,77 @@ const FAQ = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="language">Language</Label>
-                  <Select 
-                    value={newFAQ.language} 
-                    onValueChange={(value: string) => setNewFAQ(prev => ({ ...prev, language: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select language" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="en">English</SelectItem>
-                      <SelectItem value="pl">Polish</SelectItem>
-                      <SelectItem value="ru">Russian</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="category">Category (Optional)</Label>
-                  <Input
-                    id="category"
-                    placeholder="e.g., Processing Times, Requirements"
-                    value={newFAQ.category}
-                    onChange={(e) => setNewFAQ(prev => ({ ...prev, category: e.target.value }))}
-                  />
-                </div>
+              {/* Translation Toggle Buttons */}
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={showPolish ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setShowPolish(!showPolish)}
+                >
+                  {showPolish ? "Remove" : "Add"} Polish
+                </Button>
+                <Button
+                  type="button"
+                  variant={showRussian ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setShowRussian(!showRussian)}
+                >
+                  {showRussian ? "Remove" : "Add"} Russian
+                </Button>
               </div>
+
+              {/* Polish Translation Fields */}
+              {showPolish && (
+                <div className="space-y-4 p-4 border rounded-lg bg-muted/20">
+                  <h4 className="font-semibold text-sm">Polish Translation</h4>
+                  <div>
+                    <Label htmlFor="question_pl">Question (Polish)</Label>
+                    <Input
+                      id="question_pl"
+                      placeholder="Enter the question in Polish..."
+                      value={newFAQ.question_pl}
+                      onChange={(e) => setNewFAQ(prev => ({ ...prev, question_pl: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="answer_pl">Answer (Polish)</Label>
+                    <Textarea
+                      id="answer_pl"
+                      placeholder="Enter the answer in Polish..."
+                      value={newFAQ.answer_pl}
+                      onChange={(e) => setNewFAQ(prev => ({ ...prev, answer_pl: e.target.value }))}
+                      rows={3}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Russian Translation Fields */}
+              {showRussian && (
+                <div className="space-y-4 p-4 border rounded-lg bg-muted/20">
+                  <h4 className="font-semibold text-sm">Russian Translation</h4>
+                  <div>
+                    <Label htmlFor="question_ru">Question (Russian)</Label>
+                    <Input
+                      id="question_ru"
+                      placeholder="Enter the question in Russian..."
+                      value={newFAQ.question_ru}
+                      onChange={(e) => setNewFAQ(prev => ({ ...prev, question_ru: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="answer_ru">Answer (Russian)</Label>
+                    <Textarea
+                      id="answer_ru"
+                      placeholder="Enter the answer in Russian..."
+                      value={newFAQ.answer_ru}
+                      onChange={(e) => setNewFAQ(prev => ({ ...prev, answer_ru: e.target.value }))}
+                      rows={3}
+                    />
+                  </div>
+                </div>
+              )}
 
               <div className="flex justify-end space-x-2 pt-4">
                 <Button 
