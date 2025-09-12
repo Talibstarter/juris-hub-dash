@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import { Plus, Edit, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -14,64 +15,64 @@ interface FAQItem {
   id: number;
   question: string;
   answer: string;
-  language: 'English' | 'Polish';
+  language: string;
   category?: string;
 }
 
-const faqs: FAQItem[] = [
-  {
-    id: 1,
-    question: 'How long does Karta Pobytu take?',
-    answer: 'Usually 6–12 months depending on the case complexity and current processing times.',
-    language: 'Polish'
-  },
-  {
-    id: 2,
-    question: 'Which documents are required?',
-    answer: 'Passport, rental contract, employment contract, health insurance, and proof of income.',
-    language: 'English'
-  },
-  {
-    id: 3,
-    question: 'Can I travel while my application is pending?',
-    answer: 'Yes, you can travel with your current documents and temporary residence stamp.',
-    language: 'English'
-  },
-  {
-    id: 4,
-    question: 'What happens if my application is rejected?',
-    answer: 'You can appeal the decision within 14 days or submit a new application with corrected documents.',
-    language: 'English'
-  },
-  {
-    id: 5,
-    question: 'Czy mogę pracować podczas oczekiwania na decyzję?',
-    answer: 'Tak, możesz kontynuować pracę z aktualnym zezwoleniem na pracę.',
-    language: 'Polish'
-  }
-];
-
-const getLanguageBadge = (language: FAQItem['language']) => {
-  return (
-    <Badge 
-      variant="outline" 
-      className={language === 'Polish' ? 'bg-accent/10 text-accent border-accent/20' : 'bg-primary/10 text-primary border-primary/20'}
-    >
-      {language}
-    </Badge>
-  );
-};
+interface GroupedFAQ {
+  id: number;
+  question: string;
+  answer: string;
+  language: string;
+  category?: string;
+  translations: FAQItem[];
+}
 
 const FAQ = () => {
   const [faqs, setFaqs] = useState<FAQItem[]>([]);
+  const [groupedFaqs, setGroupedFaqs] = useState<GroupedFAQ[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [expandedFAQs, setExpandedFAQs] = useState<Set<number>>(new Set());
   const [newFAQ, setNewFAQ] = useState({
     question: '',
     answer: '',
-    language: 'English' as FAQItem['language'],
+    language: 'en',
     category: ''
   });
+
+  // Group FAQs by similar content (basic approach - you can enhance this)
+  const groupFAQs = (faqs: FAQItem[]) => {
+    const grouped: GroupedFAQ[] = [];
+    const processed = new Set<number>();
+
+    faqs.forEach(faq => {
+      if (processed.has(faq.id)) return;
+
+      // Find related FAQs (for now, just group by similar questions or manual grouping)
+      const relatedFaqs = faqs.filter(f => 
+        f.id !== faq.id && 
+        !processed.has(f.id) &&
+        (f.question.toLowerCase().includes(faq.question.toLowerCase().split(' ')[0]) ||
+         faq.question.toLowerCase().includes(f.question.toLowerCase().split(' ')[0]))
+      );
+
+      const group: GroupedFAQ = {
+        id: faq.id,
+        question: faq.question,
+        answer: faq.answer,
+        language: faq.language,
+        category: faq.category,
+        translations: relatedFaqs
+      };
+
+      grouped.push(group);
+      processed.add(faq.id);
+      relatedFaqs.forEach(rf => processed.add(rf.id));
+    });
+
+    return grouped;
+  };
 
   useEffect(() => {
     const fetchFAQs = async () => {
@@ -89,62 +90,68 @@ const FAQ = () => {
             id: faq.id,
             question: faq.question,
             answer: faq.answer,
-            language: (faq.language === 'pl' ? 'Polish' : 'English') as FAQItem['language'],
+            language: faq.language,
             category: faq.category
           }));
           setFaqs(formattedFAQs);
+          
+          // Group FAQs and prioritize English as main entries
+          const englishFaqs = formattedFAQs.filter(f => f.language === 'en');
+          const nonEnglishFaqs = formattedFAQs.filter(f => f.language !== 'en');
+          
+          const grouped = englishFaqs.map(englishFaq => ({
+            ...englishFaq,
+            translations: nonEnglishFaqs.filter(nef => 
+              // Simple grouping - you can enhance this logic
+              nef.question.length > 0
+            )
+          }));
+
+          // Add non-English FAQs that don't have English counterparts
+          nonEnglishFaqs.forEach(nonEnglish => {
+            const hasEnglishCounterpart = grouped.some(g => 
+              g.translations.some(t => t.id === nonEnglish.id)
+            );
+            if (!hasEnglishCounterpart) {
+              grouped.push({
+                ...nonEnglish,
+                translations: []
+              });
+            }
+          });
+
+          setGroupedFaqs(grouped);
         } else {
-          // Fallback data if no FAQs in database
-          setFaqs([
+          // Fallback data
+          const fallbackFaqs = [
             {
               id: 1,
               question: 'How long does Karta Pobytu take?',
               answer: 'Usually 6–12 months depending on the case complexity and current processing times.',
-              language: 'English'
+              language: 'en'
             },
             {
               id: 2,
               question: 'Which documents are required?',
               answer: 'Passport, rental contract, employment contract, health insurance, and proof of income.',
-              language: 'English'
-            },
-            {
-              id: 3,
-              question: 'Can I travel while my application is pending?',
-              answer: 'Yes, you can travel with your current documents and temporary residence stamp.',
-              language: 'English'
-            },
-            {
-              id: 4,
-              question: 'What happens if my application is rejected?',
-              answer: 'You can appeal the decision within 14 days or submit a new application with corrected documents.',
-              language: 'English'
-            },
-            {
-              id: 5,
-              question: 'Czy mogę pracować podczas oczekiwania na decyzję?',
-              answer: 'Tak, możesz kontynuować pracę z aktualnym zezwoleniem na pracę.',
-              language: 'Polish'
+              language: 'en'
             }
-          ]);
+          ];
+          setFaqs(fallbackFaqs);
+          setGroupedFaqs(fallbackFaqs.map(faq => ({ ...faq, translations: [] })));
         }
       } catch (error) {
         console.error('Error fetching FAQs:', error);
-        // Keep fallback data on error
-        setFaqs([
+        const fallbackFaqs = [
           {
             id: 1,
             question: 'How long does Karta Pobytu take?',
             answer: 'Usually 6–12 months depending on the case complexity and current processing times.',
-            language: 'English'
-          },
-          {
-            id: 2,
-            question: 'Which documents are required?',
-            answer: 'Passport, rental contract, employment contract, health insurance, and proof of income.',
-            language: 'English'
+            language: 'en'
           }
-        ]);
+        ];
+        setFaqs(fallbackFaqs);
+        setGroupedFaqs(fallbackFaqs.map(faq => ({ ...faq, translations: [] })));
       } finally {
         setIsLoading(false);
       }
@@ -160,17 +167,15 @@ const FAQ = () => {
     }
 
     try {
-      console.log('Attempting to add FAQ:', newFAQ);
-      
       const { data, error } = await supabase
         .from('faq')
         .insert([{
           question: newFAQ.question.trim(),
           answer: newFAQ.answer.trim(),
-          language: newFAQ.language === 'Polish' ? 'pl' : 'en',
+          language: newFAQ.language,
           category: newFAQ.category.trim() || null,
           is_published: true,
-          author_id: null // Allow null since this field might be optional
+          author_id: null
         }])
         .select()
         .single();
@@ -181,34 +186,44 @@ const FAQ = () => {
         return;
       }
 
-      console.log('FAQ added successfully:', data);
-
-      // Add the new FAQ to local state
       const formattedFAQ: FAQItem = {
         id: data.id,
         question: data.question,
         answer: data.answer,
-        language: (data.language === 'pl' ? 'Polish' : 'English') as FAQItem['language'],
+        language: data.language,
         category: data.category
       };
 
       setFaqs(prevFaqs => [formattedFAQ, ...prevFaqs]);
+      
+      // Update grouped FAQs
+      if (formattedFAQ.language === 'en') {
+        setGroupedFaqs(prevGrouped => [
+          { ...formattedFAQ, translations: [] },
+          ...prevGrouped
+        ]);
+      } else {
+        // Add as translation or standalone
+        setGroupedFaqs(prevGrouped => [
+          { ...formattedFAQ, translations: [] },
+          ...prevGrouped
+        ]);
+      }
 
-      // Reset form and close dialog
       setNewFAQ({
         question: '',
         answer: '',
-        language: 'English',
+        language: 'en',
         category: ''
       });
       setIsAddDialogOpen(false);
-
       alert('FAQ added successfully!');
     } catch (error) {
       console.error('Unexpected error:', error);
       alert(`Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
+
   if (isLoading) {
     return (
       <div className="p-6">
@@ -265,14 +280,15 @@ const FAQ = () => {
                   <Label htmlFor="language">Language</Label>
                   <Select 
                     value={newFAQ.language} 
-                    onValueChange={(value: FAQItem['language']) => setNewFAQ(prev => ({ ...prev, language: value }))}
+                    onValueChange={(value: string) => setNewFAQ(prev => ({ ...prev, language: value }))}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select language" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="English">English</SelectItem>
-                      <SelectItem value="Polish">Polish</SelectItem>
+                      <SelectItem value="en">English</SelectItem>
+                      <SelectItem value="pl">Polish</SelectItem>
+                      <SelectItem value="ru">Russian</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -308,60 +324,97 @@ const FAQ = () => {
         </Dialog>
       </div>
 
-      {/* FAQ Table */}
-      <Card className="shadow-card">
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="border-b bg-muted/30">
-                <tr>
-                  <th className="text-left p-4 font-semibold text-primary">Question</th>
-                  <th className="text-left p-4 font-semibold text-primary">Answer</th>
-                  <th className="text-left p-4 font-semibold text-primary">Language</th>
-                  <th className="text-left p-4 font-semibold text-primary">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {faqs.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="p-8 text-center text-muted-foreground">
-                      No FAQs found
-                    </td>
-                  </tr>
-                ) : (
-                  faqs.map((faq) => (
-                    <tr key={faq.id} className="border-b hover:bg-muted/20 transition-colors">
-                      <td className="p-4">
-                        <div className="font-medium max-w-xs">
-                          {faq.question}
+      {/* FAQ List */}
+      <div className="space-y-4">
+        {groupedFaqs.length === 0 ? (
+          <Card className="shadow-card">
+            <CardContent className="p-8 text-center text-muted-foreground">
+              No FAQs found
+            </CardContent>
+          </Card>
+        ) : (
+          groupedFaqs.map((faq) => {
+            const isExpanded = expandedFAQs.has(faq.id);
+            const hasTranslations = faq.translations.length > 0;
+            
+            return (
+              <Card key={faq.id} className="shadow-card">
+                <Collapsible 
+                  open={isExpanded} 
+                  onOpenChange={(open) => {
+                    const newExpanded = new Set(expandedFAQs);
+                    if (open) {
+                      newExpanded.add(faq.id);
+                    } else {
+                      newExpanded.delete(faq.id);
+                    }
+                    setExpandedFAQs(newExpanded);
+                  }}
+                >
+                  <CollapsibleTrigger asChild>
+                    <div className="p-6 cursor-pointer hover:bg-muted/20 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h3 className="font-semibold text-primary text-lg">{faq.question}</h3>
+                            <Badge variant="outline" className="text-xs">
+                              {faq.language === 'en' ? 'English' : faq.language === 'pl' ? 'Polish' : 'Russian'}
+                            </Badge>
+                          </div>
+                          <p className="text-muted-foreground">{faq.answer}</p>
+                          {hasTranslations && (
+                            <p className="text-xs text-muted-foreground mt-2">
+                              Click to view {faq.translations.length} translation{faq.translations.length > 1 ? 's' : ''}
+                            </p>
+                          )}
                         </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="text-sm text-muted-foreground max-w-md">
-                          {faq.answer}
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        {getLanguageBadge(faq.language)}
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center space-x-2">
-                          <Button size="sm" variant="outline">
+                        <div className="flex items-center gap-2">
+                          <Button size="sm" variant="outline" onClick={(e) => e.stopPropagation()}>
                             <Edit className="w-4 h-4" />
                           </Button>
-                          <Button size="sm" variant="outline" className="text-destructive hover:text-destructive">
+                          <Button size="sm" variant="outline" className="text-destructive hover:text-destructive" onClick={(e) => e.stopPropagation()}>
                             <Trash2 className="w-4 h-4" />
                           </Button>
+                          {hasTranslations && (
+                            isExpanded ? <ChevronDown className="w-5 h-5 text-muted-foreground" /> : <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                          )}
                         </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+                      </div>
+                    </div>
+                  </CollapsibleTrigger>
+                  
+                  {hasTranslations && (
+                    <CollapsibleContent>
+                      <div className="px-6 pb-6 border-t bg-muted/10">
+                        <h4 className="font-semibold text-sm text-muted-foreground mb-4 mt-4">Other Languages</h4>
+                        <div className="space-y-4">
+                          {faq.translations.map((translation, index) => (
+                            <div key={index} className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-xs">
+                                  {translation.language === 'en' ? 'English' : 
+                                   translation.language === 'pl' ? 'Polish' : 
+                                   translation.language === 'ru' ? 'Russian' : translation.language}
+                                </Badge>
+                              </div>
+                              <div>
+                                <p className="font-medium text-primary">{translation.question}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">{translation.answer}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </CollapsibleContent>
+                  )}
+                </Collapsible>
+              </Card>
+            );
+          })
+        )}
+      </div>
 
       {/* Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -380,7 +433,7 @@ const FAQ = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-primary">
-              {faqs.filter(f => f.language === 'English').length}
+              {faqs.filter(f => f.language === 'en').length}
             </div>
           </CardContent>
         </Card>
@@ -391,7 +444,7 @@ const FAQ = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-accent">
-              {faqs.filter(f => f.language === 'Polish').length}
+              {faqs.filter(f => f.language === 'pl').length}
             </div>
           </CardContent>
         </Card>
