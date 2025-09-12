@@ -17,6 +17,10 @@ interface FAQItem {
   answer: string;
   language: string;
   category?: string;
+  question_pl?: string;
+  answer_pl?: string;
+  question_ru?: string;
+  answer_ru?: string;
 }
 
 const FAQ = () => {
@@ -36,7 +40,7 @@ const FAQ = () => {
       try {
         const { data, error } = await supabase
           .from('faq')
-          .select('*')
+          .select('id, question, answer, language, category, question_pl, answer_pl, question_ru, answer_ru, is_published, author_id, created_at, updated_at')
           .eq('is_published', true)
           .order('created_at', { ascending: false });
 
@@ -48,7 +52,11 @@ const FAQ = () => {
             question: faq.question,
             answer: faq.answer,
             language: faq.language,
-            category: faq.category
+            category: faq.category,
+            question_pl: faq.question_pl,
+            answer_pl: faq.answer_pl,
+            question_ru: faq.question_ru,
+            answer_ru: faq.answer_ru
           }));
           setFaqs(formattedFAQs);
         } else {
@@ -117,7 +125,11 @@ const FAQ = () => {
         question: data.question,
         answer: data.answer,
         language: data.language,
-        category: data.category
+        category: data.category,
+        question_pl: data.question_pl,
+        answer_pl: data.answer_pl,
+        question_ru: data.question_ru,
+        answer_ru: data.answer_ru
       };
 
       setFaqs(prevFaqs => [formattedFAQ, ...prevFaqs]);
@@ -247,6 +259,7 @@ const FAQ = () => {
         ) : (
           faqs.map((faq) => {
             const isExpanded = expandedFAQs.has(faq.id);
+            const hasTranslations = faq.question_pl || faq.answer_pl || faq.question_ru || faq.answer_ru;
             
             return (
               <Card key={faq.id} className="shadow-card">
@@ -277,7 +290,11 @@ const FAQ = () => {
                               </Badge>
                             )}
                           </div>
-                          <p className="text-xs text-muted-foreground">Click to view full answer</p>
+                          {hasTranslations ? (
+                            <p className="text-xs text-muted-foreground">Click to view translations</p>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">Click to view full answer</p>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           <Button size="sm" variant="outline" onClick={(e) => e.stopPropagation()}>
@@ -298,6 +315,49 @@ const FAQ = () => {
                         <h4 className="font-semibold text-sm text-muted-foreground mb-2">Answer</h4>
                         <p className="text-muted-foreground leading-relaxed">{faq.answer}</p>
                       </div>
+                      
+                      {hasTranslations && (
+                        <div className="mt-6">
+                          <h4 className="font-semibold text-sm text-muted-foreground mb-4">Other Languages</h4>
+                          <div className="space-y-4">
+                            {(faq.question_pl || faq.answer_pl) && (
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className="text-xs">Polish</Badge>
+                                </div>
+                                {faq.question_pl && (
+                                  <div>
+                                    <p className="font-medium text-primary">{faq.question_pl}</p>
+                                  </div>
+                                )}
+                                {faq.answer_pl && (
+                                  <div>
+                                    <p className="text-muted-foreground leading-relaxed">{faq.answer_pl}</p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            
+                            {(faq.question_ru || faq.answer_ru) && (
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className="text-xs">Russian</Badge>
+                                </div>
+                                {faq.question_ru && (
+                                  <div>
+                                    <p className="font-medium text-primary">{faq.question_ru}</p>
+                                  </div>
+                                )}
+                                {faq.answer_ru && (
+                                  <div>
+                                    <p className="text-muted-foreground leading-relaxed">{faq.answer_ru}</p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </CollapsibleContent>
                 </Collapsible>
