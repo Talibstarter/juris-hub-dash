@@ -284,6 +284,8 @@ export type Database = {
       faq: {
         Row: {
           answer: string
+          answer_pl: string | null
+          answer_ru: string | null
           author_id: number | null
           category: string | null
           created_at: string | null
@@ -291,10 +293,14 @@ export type Database = {
           is_published: boolean | null
           language: string | null
           question: string
+          question_pl: string | null
+          question_ru: string | null
           updated_at: string | null
         }
         Insert: {
           answer: string
+          answer_pl?: string | null
+          answer_ru?: string | null
           author_id?: number | null
           category?: string | null
           created_at?: string | null
@@ -302,10 +308,14 @@ export type Database = {
           is_published?: boolean | null
           language?: string | null
           question: string
+          question_pl?: string | null
+          question_ru?: string | null
           updated_at?: string | null
         }
         Update: {
           answer?: string
+          answer_pl?: string | null
+          answer_ru?: string | null
           author_id?: number | null
           category?: string | null
           created_at?: string | null
@@ -313,6 +323,8 @@ export type Database = {
           is_published?: boolean | null
           language?: string | null
           question?: string
+          question_pl?: string | null
+          question_ru?: string | null
           updated_at?: string | null
         }
         Relationships: [
