@@ -14,6 +14,7 @@ interface Question {
   status: 'open' | 'answered' | 'pending';
   language?: string;
   answer?: string;
+  clientType: 'client' | 'non-client';
 }
 
 const getStatusBadge = (status: Question['status']) => {
@@ -40,9 +41,11 @@ const ClientQuestions = () => {
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
   const [answer, setAnswer] = useState('');
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [filteredQuestions, setFilteredQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'client' | 'non-client'>('all');
 
   useEffect(() => {
     const fetchQuestions = async () => {
@@ -64,14 +67,25 @@ const ClientQuestions = () => {
             .select('id, first_name, last_name, telegram_id')
             .in('telegram_id', telegramIds);
 
+          // Fetch cases data to determine client status
+          const { data: casesData } = await supabase
+            .from('cases')
+            .select('telegram_id')
+            .in('telegram_id', telegramIds);
+
           // Create a map of telegram_id to user data
           const usersMap = new Map();
           usersData?.forEach(user => {
             usersMap.set(user.telegram_id, user);
           });
 
+          // Create a set of telegram_ids that exist in cases (clients)
+          const clientTelegramIds = new Set(casesData?.map(c => c.telegram_id) || []);
+
           const formattedQuestions = questionsData.map(q => {
             const user = usersMap.get(q.telegram_id);
+            const isClient = clientTelegramIds.has(q.telegram_id);
+            
             return {
               id: q.id,
               clientName: user 
@@ -82,7 +96,8 @@ const ClientQuestions = () => {
               status: (q.status === 'new' ? 'open' : 
                       q.status === 'answered' ? 'answered' : 'pending') as Question['status'],
               language: q.lang || 'English',
-              answer: q.answer
+              answer: q.answer,
+              clientType: isClient ? 'client' : 'non-client' as 'client' | 'non-client'
             };
           });
           setQuestions(formattedQuestions);
@@ -99,6 +114,15 @@ const ClientQuestions = () => {
 
     fetchQuestions();
   }, []);
+
+  // Filter questions based on selected filter
+  useEffect(() => {
+    if (filter === 'all') {
+      setFilteredQuestions(questions);
+    } else {
+      setFilteredQuestions(questions.filter(q => q.clientType === filter));
+    }
+  }, [questions, filter]);
 
   const handleSendResponse = async () => {
     if (!selectedQuestion || !answer.trim()) {
@@ -309,9 +333,36 @@ const ClientQuestions = () => {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-primary">Clients' Questions</h1>
-        <p className="text-muted-foreground">Manage and respond to client inquiries</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-primary">Questions</h1>
+          <p className="text-muted-foreground">Manage and respond to client inquiries</p>
+        </div>
+        
+        {/* Filter Buttons */}
+        <div className="flex items-center space-x-2">
+          <Button
+            variant={filter === 'all' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setFilter('all')}
+          >
+            All
+          </Button>
+          <Button
+            variant={filter === 'client' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setFilter('client')}
+          >
+            Client
+          </Button>
+          <Button
+            variant={filter === 'non-client' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setFilter('non-client')}
+          >
+            Non Client
+          </Button>
+        </div>
       </div>
 
       {/* Statistics */}
@@ -322,7 +373,7 @@ const ClientQuestions = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-destructive">
-              {questions.filter(q => q.status === 'open').length}
+              {filteredQuestions.filter(q => q.status === 'open').length}
             </div>
           </CardContent>
         </Card>
@@ -333,7 +384,7 @@ const ClientQuestions = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-warning">
-              {questions.filter(q => q.status === 'pending').length}
+              {filteredQuestions.filter(q => q.status === 'pending').length}
             </div>
           </CardContent>
         </Card>
@@ -344,7 +395,7 @@ const ClientQuestions = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-success">
-              {questions.filter(q => q.status === 'answered').length}
+              {filteredQuestions.filter(q => q.status === 'answered').length}
             </div>
           </CardContent>
         </Card>
@@ -365,14 +416,14 @@ const ClientQuestions = () => {
                 </tr>
               </thead>
               <tbody>
-                {questions.length === 0 ? (
+                {filteredQuestions.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="p-8 text-center text-muted-foreground">
                       No questions found
                     </td>
                   </tr>
                 ) : (
-                  questions.map((question) => (
+                  filteredQuestions.map((question) => (
                     <tr key={question.id} className="border-b hover:bg-muted/20 transition-colors">
                       <td className="p-4">
                         <div className="font-medium">{question.clientName}</div>
