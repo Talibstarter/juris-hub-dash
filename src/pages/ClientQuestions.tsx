@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, MessageSquare, Send } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface Question {
   id: number;
@@ -46,6 +47,7 @@ const ClientQuestions = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [filter, setFilter] = useState<'all' | 'client' | 'non-client'>('all');
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchQuestions = async () => {
@@ -124,9 +126,69 @@ const ClientQuestions = () => {
     }
   }, [questions, filter]);
 
+  // Set up real-time subscription for new questions
+  useEffect(() => {
+    const channel = supabase
+      .channel('questions-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'questions'
+        },
+        (payload) => {
+          console.log('New question received:', payload);
+          toast({
+            title: "New Question",
+            description: "A new question has been received from a client.",
+          });
+          
+          // Refresh questions list
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'questions'
+        },
+        (payload) => {
+          console.log('Question updated:', payload);
+          
+          // Update the question in local state
+          setQuestions(prevQuestions =>
+            prevQuestions.map(q =>
+              q.id === payload.new.id
+                ? {
+                    ...q,
+                    status: payload.new.status === 'answered' ? 'answered' : 
+                           payload.new.status === 'new' ? 'open' : 'pending',
+                    answer: payload.new.answer
+                  }
+                : q
+            )
+          );
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [toast]);
+
   const handleSendResponse = async () => {
     if (!selectedQuestion || !answer.trim()) {
-      alert('Please enter a response');
+      toast({
+        title: "Error",
+        description: "Please enter a response",
+        variant: "destructive"
+      });
       return;
     }
 
@@ -134,6 +196,24 @@ const ClientQuestions = () => {
     try {
       console.log('Sending response for question:', selectedQuestion.id);
       
+      // First, get the question details including telegram_id
+      const { data: questionData, error: fetchError } = await supabase
+        .from('questions')
+        .select('telegram_id, text')
+        .eq('id', selectedQuestion.id)
+        .single();
+
+      if (fetchError) {
+        console.error('Error fetching question:', fetchError);
+        toast({
+          title: "Error",
+          description: "Failed to fetch question details",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Update the question in database
       const { error } = await supabase
         .from('questions')
         .update({
@@ -146,11 +226,39 @@ const ClientQuestions = () => {
 
       if (error) {
         console.error('Database error:', error);
-        alert(`Error sending response: ${error.message}`);
+        toast({
+          title: "Error",
+          description: `Error sending response: ${error.message}`,
+          variant: "destructive"
+        });
         return;
       }
 
       console.log('Response sent successfully');
+
+      // Send Telegram notification to the user
+      try {
+        const notificationResponse = await supabase.functions.invoke('telegram-notify', {
+          body: {
+            telegram_id: questionData.telegram_id,
+            message: `🔔 <b>Answer from your lawyer:</b>\n\n<b>Your question:</b> ${questionData.text.substring(0, 100)}${questionData.text.length > 100 ? '...' : ''}\n\n<b>Answer:</b> ${answer.trim()}`,
+            question_id: selectedQuestion.id
+          }
+        });
+
+        if (notificationResponse.error) {
+          console.error('Telegram notification error:', notificationResponse.error);
+          toast({
+            title: "Warning",
+            description: "Response saved but failed to notify client via Telegram",
+            variant: "destructive"
+          });
+        } else {
+          console.log('Telegram notification sent successfully');
+        }
+      } catch (notificationError) {
+        console.error('Notification error:', notificationError);
+      }
 
       // Update local state
       setQuestions(prevQuestions => 
@@ -175,10 +283,18 @@ const ClientQuestions = () => {
       const draftKey = `draft_${selectedQuestion.id}`;
       localStorage.removeItem(draftKey);
       
-      alert('Response sent successfully!');
+      toast({
+        title: "Success",
+        description: "Response sent successfully and client notified!"
+      });
+
     } catch (error) {
       console.error('Unexpected error:', error);
-      alert(`Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast({
+        title: "Error",
+        description: `Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive"
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -186,7 +302,11 @@ const ClientQuestions = () => {
 
   const handleSaveDraft = async () => {
     if (!selectedQuestion || !answer.trim()) {
-      alert('Please enter some content to save as draft');
+      toast({
+        title: "Error",
+        description: "Please enter some content to save as draft",
+        variant: "destructive"
+      });
       return;
     }
 
@@ -199,10 +319,17 @@ const ClientQuestions = () => {
       localStorage.setItem(draftKey, answer.trim());
 
       console.log('Draft saved successfully');
-      alert('Draft saved successfully!');
+      toast({
+        title: "Success",
+        description: "Draft saved successfully!"
+      });
     } catch (error) {
       console.error('Error saving draft:', error);
-      alert('Error saving draft. Please try again.');
+      toast({
+        title: "Error",
+        description: "Error saving draft. Please try again.",
+        variant: "destructive"
+      });
     } finally {
       setIsSavingDraft(false);
     }

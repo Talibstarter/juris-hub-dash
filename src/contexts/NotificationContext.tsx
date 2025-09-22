@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 interface Notification {
   id: string;
-  type: 'message' | 'document';
+  type: 'message' | 'document' | 'question';
   title: string;
   description: string;
   timestamp: Date;
@@ -80,9 +80,50 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       )
       .subscribe();
 
+    // Listen for new questions
+    const questionsChannel = supabase
+      .channel('questions-notifications')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'questions'
+        },
+        async (payload) => {
+          // Get user name for the notification
+          let clientName = 'Unknown Client';
+          try {
+            const { data: userData } = await supabase
+              .from('users')
+              .select('first_name, last_name')
+              .eq('telegram_id', payload.new.telegram_id)
+              .single();
+            
+            if (userData) {
+              clientName = `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || 'Unknown Client';
+            }
+          } catch (error) {
+            console.error('Error fetching user data for notification:', error);
+          }
+
+          const newNotification: Notification = {
+            id: `question-${payload.new.id}`,
+            type: 'question',
+            title: 'New Question',
+            description: `${clientName} asked: ${payload.new.text.substring(0, 50)}${payload.new.text.length > 50 ? '...' : ''}`,
+            timestamp: new Date(),
+            read: false
+          };
+          setNotifications(prev => [newNotification, ...prev]);
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(messagesChannel);
       supabase.removeChannel(documentsChannel);
+      supabase.removeChannel(questionsChannel);
     };
   }, []);
 
