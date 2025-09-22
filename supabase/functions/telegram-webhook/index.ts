@@ -76,44 +76,11 @@ Deno.serve(async (req) => {
       return new Response('Error finding user', { status: 500, headers: corsHeaders })
     }
 
-    // Find or create case for this user
-    let { data: userCase, error: caseError } = await supabase
-      .from('cases')
-      .select('*')
-      .eq('telegram_id', telegramId)
-      .eq('active', true)
-      .single()
-
-    if (caseError && caseError.code === 'PGRST116') {
-      // No active case, create new one
-      const { data: newCase, error: createCaseError } = await supabase
-        .from('cases')
-        .insert({
-          telegram_id: telegramId,
-          client_name: `${message.from.first_name} ${message.from.last_name || ''}`.trim(),
-          username: message.from.username,
-          status: 'new',
-          public_case_id: `TG-${Date.now()}`
-        })
-        .select()
-        .single()
-
-      if (createCaseError) {
-        console.error('Error creating case:', createCaseError)
-        return new Response('Error creating case', { status: 500, headers: corsHeaders })
-      }
-      userCase = newCase
-    } else if (caseError) {
-      console.error('Error finding case:', caseError)
-      return new Response('Error finding case', { status: 500, headers: corsHeaders })
-    }
-
     // Store the message as a question
     const { error: questionError } = await supabase
       .from('questions')
       .insert({
         telegram_id: telegramId,
-        case_id: userCase.id,
         text: text,
         status: 'new',
         lang: 'en'
