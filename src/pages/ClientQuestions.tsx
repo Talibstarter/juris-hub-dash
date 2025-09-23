@@ -219,8 +219,8 @@ const ClientQuestions = () => {
         .update({
           answer: answer.trim(),
           status: 'answered',
-          answered_at: new Date().toISOString(),
-          answered_by: 1 // This would be the current user's ID in a real app
+          answered_at: new Date().toISOString()
+          // Note: answered_by removed to avoid foreign key constraint issues
         })
         .eq('id', selectedQuestion.id)
         .select();
