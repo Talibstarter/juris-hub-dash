@@ -13,6 +13,7 @@ import FAQ from "@/pages/FAQ";
 import DocumentChecklist from "@/pages/DocumentChecklist";
 import ClientQuestions from "@/pages/ClientQuestions";
 import SubmittedDocuments from "@/pages/SubmittedDocuments";
+import ClientDocuments from "@/pages/ClientDocuments";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,7 @@ const App = () => (
             <Route path="/checklist" element={<Layout><DocumentChecklist /></Layout>} />
             <Route path="/questions" element={<Layout><ClientQuestions /></Layout>} />
             <Route path="/documents" element={<Layout><SubmittedDocuments /></Layout>} />
+            <Route path="/clients/:clientId/documents" element={<Layout><ClientDocuments /></Layout>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           </BrowserRouter>

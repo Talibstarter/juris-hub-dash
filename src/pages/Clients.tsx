@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Search, Plus, Download, Filter, Edit, Save, Trash2, ArrowLeft } from 'lucide-react';
+import { Search, Plus, Download, Filter, Edit, Save, Trash2, ArrowLeft, FileText } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
 
 interface Client {
   id: number;
@@ -81,6 +82,7 @@ const getPaymentBadge = (status: Client['paymentStatus']) => {
 };
 
 const Clients = () => {
+  const navigate = useNavigate();
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [originalClient, setOriginalClient] = useState<Client | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
@@ -514,6 +516,13 @@ const Clients = () => {
               </>
             ) : (
               <>
+                <Button 
+                  variant="outline" 
+                  onClick={() => navigate(`/clients/${selectedClient.id}/documents`)}
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  View Documents
+                </Button>
                 <Button variant="outline" onClick={() => {
                   setIsEditing(true);
                   // Store original data when editing starts
