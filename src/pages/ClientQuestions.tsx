@@ -214,7 +214,7 @@ const ClientQuestions = () => {
       }
 
       // Update the question in database
-      const { error } = await supabase
+      const { data: updateResult, error } = await supabase
         .from('questions')
         .update({
           answer: answer.trim(),
@@ -222,7 +222,8 @@ const ClientQuestions = () => {
           answered_at: new Date().toISOString(),
           answered_by: 1 // This would be the current user's ID in a real app
         })
-        .eq('id', selectedQuestion.id);
+        .eq('id', selectedQuestion.id)
+        .select();
 
       if (error) {
         console.error('Database error:', error);
@@ -233,6 +234,8 @@ const ClientQuestions = () => {
         });
         return;
       }
+
+      console.log('Database update result:', updateResult);
 
       console.log('Response sent successfully');
 
