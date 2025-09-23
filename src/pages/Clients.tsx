@@ -349,6 +349,7 @@ const Clients = () => {
     // Map client fields to database column names and compare
     const fieldMappings = {
       name: 'client_name',
+      caseNumber: 'public_case_id',
       applicationType: 'application_type',
       typeOfStay: 'type_of_stay',
       office: 'office',
@@ -595,36 +596,125 @@ const Clients = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Case Number</Label>
-                  <p className="font-medium">{selectedClient.caseNumber}</p>
+                  {isEditing ? (
+                    <Input
+                      value={selectedClient.caseNumber}
+                      onChange={(e) => setSelectedClient(prev => prev ? {...prev, caseNumber: e.target.value} : null)}
+                    />
+                  ) : (
+                    <p className="font-medium">{selectedClient.caseNumber}</p>
+                  )}
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Application Type (Wniosek)</Label>
-                  <p>{selectedClient.applicationType}</p>
+                  {isEditing ? (
+                    <Select 
+                      value={selectedClient.applicationType} 
+                      onValueChange={(value) => setSelectedClient(prev => prev ? {...prev, applicationType: value} : null)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Temporary Residence">Temporary Residence</SelectItem>
+                        <SelectItem value="Permanent Residence">Permanent Residence</SelectItem>
+                        <SelectItem value="Work Permit">Work Permit</SelectItem>
+                        <SelectItem value="EU Blue Card">EU Blue Card</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <p>{selectedClient.applicationType}</p>
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Type of Stay (Pobyt)</Label>
-                  <p>{selectedClient.typeOfStay}</p>
+                  {isEditing ? (
+                    <Select 
+                      value={selectedClient.typeOfStay} 
+                      onValueChange={(value) => setSelectedClient(prev => prev ? {...prev, typeOfStay: value} : null)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Work Permit">Work Permit</SelectItem>
+                        <SelectItem value="Student Visa">Student Visa</SelectItem>
+                        <SelectItem value="Family Reunification">Family Reunification</SelectItem>
+                        <SelectItem value="Business">Business</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <p>{selectedClient.typeOfStay}</p>
+                  )}
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Office (Urząd)</Label>
-                  <p>{selectedClient.office}</p>
+                  {isEditing ? (
+                    <Select 
+                      value={selectedClient.office} 
+                      onValueChange={(value) => setSelectedClient(prev => prev ? {...prev, office: value} : null)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Warsaw Office">Warsaw Office</SelectItem>
+                        <SelectItem value="Krakow Office">Krakow Office</SelectItem>
+                        <SelectItem value="Gdansk Office">Gdansk Office</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <p>{selectedClient.office}</p>
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Inspector</Label>
-                  <p>{selectedClient.inspector}</p>
+                  {isEditing ? (
+                    <Select 
+                      value={selectedClient.inspector} 
+                      onValueChange={(value) => setSelectedClient(prev => prev ? {...prev, inspector: value} : null)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Jan Kowalski">Jan Kowalski</SelectItem>
+                        <SelectItem value="Anna Nowak">Anna Nowak</SelectItem>
+                        <SelectItem value="Piotr Wiśniewski">Piotr Wiśniewski</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <p>{selectedClient.inspector}</p>
+                  )}
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Review Date (Data Rozpatrzenia)</Label>
-                  <p>{selectedClient.reviewDate}</p>
+                  {isEditing ? (
+                    <Input
+                      type="date"
+                      value={selectedClient.reviewDate}
+                      onChange={(e) => setSelectedClient(prev => prev ? {...prev, reviewDate: e.target.value} : null)}
+                    />
+                  ) : (
+                    <p>{selectedClient.reviewDate}</p>
+                  )}
                 </div>
               </div>
               <div>
                 <Label className="text-sm font-medium text-muted-foreground">Biometrics Date (Data Odcisków)</Label>
-                <p>{selectedClient.biometricsDate}</p>
+                {isEditing ? (
+                  <Input
+                    type="date"
+                    value={selectedClient.biometricsDate}
+                    onChange={(e) => setSelectedClient(prev => prev ? {...prev, biometricsDate: e.target.value} : null)}
+                  />
+                ) : (
+                  <p>{selectedClient.biometricsDate}</p>
+                )}
               </div>
             </CardContent>
           </Card>
