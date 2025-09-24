@@ -95,13 +95,11 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           let clientName = 'Unknown Client';
           try {
             const { data: userData } = await supabase
-              .from('users')
-              .select('first_name, last_name')
-              .eq('telegram_id', payload.new.telegram_id)
-              .single();
+              .rpc('get_users_by_telegram_ids', { telegram_ids: [payload.new.telegram_id] });
             
-            if (userData) {
-              clientName = `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || 'Unknown Client';
+            if (userData && userData.length > 0) {
+              const user = userData[0] as any;
+              clientName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username || 'Unknown Client';
             }
           } catch (error) {
             console.error('Error fetching user data for notification:', error);
