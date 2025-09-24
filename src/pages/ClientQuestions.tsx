@@ -65,14 +65,14 @@ const ClientQuestions = () => {
         if (error) throw error;
 
         if (messagesData && messagesData.length > 0) {
-          // Get unique sender_ids from messages
+          // Get unique sender_ids from messages (these are now telegram_ids)
           const senderIds = [...new Set(messagesData.map(m => m.sender_id).filter(Boolean))];
           
-          // Fetch user data for these sender_ids
+          // Fetch user data for these sender_ids (using telegram_id as the key)
           const { data: usersData } = await supabase
             .from('users')
-            .select('id, first_name, last_name, telegram_id')
-            .in('id', senderIds);
+            .select('telegram_id, first_name, last_name')
+            .in('telegram_id', senderIds);
 
           // Get telegram_ids from users to check client status
           const telegramIds = usersData?.map(u => u.telegram_id).filter(Boolean) || [];
@@ -83,10 +83,10 @@ const ClientQuestions = () => {
             .select('telegram_id')
             .in('telegram_id', telegramIds);
 
-          // Create a map of user_id to user data
+          // Create a map of telegram_id to user data
           const usersMap = new Map();
           usersData?.forEach(user => {
-            usersMap.set(user.id, user);
+            usersMap.set(user.telegram_id, user);
           });
 
           // Create a set of telegram_ids that exist in cases (clients)
@@ -125,7 +125,7 @@ const ClientQuestions = () => {
               language: m.language || 'English',
               sender_id: m.sender_id,
               case_id: m.case_id,
-              telegram_id: user?.telegram_id,
+              telegram_id: m.sender_id, // sender_id is now the telegram_id
               replies: replies,
               clientType: isClient ? 'client' : 'non-client' as 'client' | 'non-client'
             };
@@ -205,7 +205,7 @@ const ClientQuestions = () => {
         .insert({
           content: reply.trim(),
           parent_message_id: selectedMessage.id,
-          sender_id: 1, // Assuming lawyer user ID is 1 for now
+          sender_id: 1, // Assuming lawyer telegram_id is 1 for now
           recipient_id: selectedMessage.sender_id,
           case_id: selectedMessage.case_id,
           type: 'response',
