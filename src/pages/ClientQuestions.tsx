@@ -68,22 +68,16 @@ const ClientQuestions = () => {
           // Get unique sender_ids from messages (these are now telegram_ids)
           const senderIds = [...new Set(messagesData.map(m => m.sender_id).filter(Boolean))];
           
-          // Use raw SQL query to avoid TypeScript issues with column names
-          const { data: usersData } = await supabase
-            .rpc('get_users_by_ids', { user_ids: senderIds });
+          // Use our custom function to get users by telegram_ids
+          const { data: usersData, error: usersError } = await supabase
+            .rpc('get_users_by_telegram_ids', { telegram_ids: senderIds });
 
-          // If the RPC doesn't exist, fall back to a direct query
-          let usersList = usersData;
-          if (!usersData) {
-            const { data: fallbackUsers } = await supabase
-              .from('users')
-              .select('*')
-              .in('telegram_id', senderIds);
-            usersList = fallbackUsers;
+          if (usersError) {
+            console.error('Error fetching users:', usersError);
           }
 
           // Get telegram_ids from users to check client status
-          const telegramIds = usersList?.map((u: any) => u.id || u.telegram_id).filter(Boolean) || [];
+          const telegramIds = usersData?.map((u: any) => u.telegram_id).filter(Boolean) || [];
 
           // Fetch cases data to determine client status
           const { data: casesData } = await supabase
@@ -93,8 +87,8 @@ const ClientQuestions = () => {
 
           // Create a map of telegram_id to user data
           const usersMap = new Map();
-          usersList?.forEach((user: any) => {
-            usersMap.set(user.id || user.telegram_id, user);
+          usersData?.forEach((user: any) => {
+            usersMap.set(user.telegram_id, user);
           });
 
           // Create a set of telegram_ids that exist in cases (clients)
@@ -119,7 +113,7 @@ const ClientQuestions = () => {
 
           const formattedMessages = messagesData.map(m => {
             const user = usersMap.get(m.sender_id);
-            const isClient = user && clientTelegramIds.has(user.id); // user.id is telegram_id
+            const isClient = user && clientTelegramIds.has(user.telegram_id);
             const replies = repliesMap.get(m.id) || [];
             
             return {

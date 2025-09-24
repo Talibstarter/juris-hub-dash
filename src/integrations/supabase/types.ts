@@ -229,7 +229,7 @@ export type Database = {
             columns: ["telegram_id"]
             isOneToOne: false
             referencedRelation: "users"
-            referencedColumns: ["telegram_id"]
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -382,14 +382,14 @@ export type Database = {
             columns: ["recipient_id"]
             isOneToOne: false
             referencedRelation: "users"
-            referencedColumns: ["telegram_id"]
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "messages_sender_id_fkey"
             columns: ["sender_id"]
             isOneToOne: false
             referencedRelation: "users"
-            referencedColumns: ["telegram_id"]
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -574,7 +574,7 @@ export type Database = {
             columns: ["telegram_id"]
             isOneToOne: false
             referencedRelation: "users"
-            referencedColumns: ["telegram_id"]
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -674,12 +674,12 @@ export type Database = {
           created_at: string | null
           email: string | null
           first_name: string | null
+          id: number
           is_active: boolean | null
           last_name: string | null
           password_hash: string | null
           preferred_lang: string | null
           role: Database["public"]["Enums"]["user_role"] | null
-          telegram_id: number
           username: string | null
         }
         Insert: {
@@ -687,12 +687,12 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           first_name?: string | null
+          id: number
           is_active?: boolean | null
           last_name?: string | null
           password_hash?: string | null
           preferred_lang?: string | null
           role?: Database["public"]["Enums"]["user_role"] | null
-          telegram_id: number
           username?: string | null
         }
         Update: {
@@ -700,12 +700,12 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           first_name?: string | null
+          id?: number
           is_active?: boolean | null
           last_name?: string | null
           password_hash?: string | null
           preferred_lang?: string | null
           role?: Database["public"]["Enums"]["user_role"] | null
-          telegram_id?: number
           username?: string | null
         }
         Relationships: []
@@ -718,6 +718,18 @@ export type Database = {
       get_current_user_role: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      get_users_by_telegram_ids: {
+        Args: { telegram_ids: number[] }
+        Returns: {
+          created_at: string
+          first_name: string
+          is_active: boolean
+          last_name: string
+          role: string
+          telegram_id: number
+          username: string
+        }[]
       }
       set_config: {
         Args: { setting_name: string; setting_value: string }
