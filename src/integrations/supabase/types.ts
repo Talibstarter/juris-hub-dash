@@ -120,13 +120,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "case_processes_assigned_lawyer_id_fkey"
-            columns: ["assigned_lawyer_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "case_processes_case_id_fkey"
             columns: ["case_id"]
             isOneToOne: false
@@ -327,15 +320,7 @@ export type Database = {
           question_ru?: string | null
           updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "faq_author_id_fkey"
-            columns: ["author_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       messages: {
         Row: {
@@ -349,6 +334,7 @@ export type Database = {
           parent_message_id: number | null
           recipient_id: number | null
           sender_id: number | null
+          type: string | null
         }
         Insert: {
           case_id?: number | null
@@ -361,6 +347,7 @@ export type Database = {
           parent_message_id?: number | null
           recipient_id?: number | null
           sender_id?: number | null
+          type?: string | null
         }
         Update: {
           case_id?: number | null
@@ -373,6 +360,7 @@ export type Database = {
           parent_message_id?: number | null
           recipient_id?: number | null
           sender_id?: number | null
+          type?: string | null
         }
         Relationships: [
           {
@@ -394,14 +382,14 @@ export type Database = {
             columns: ["recipient_id"]
             isOneToOne: false
             referencedRelation: "users"
-            referencedColumns: ["id"]
+            referencedColumns: ["telegram_id"]
           },
           {
             foreignKeyName: "messages_sender_id_fkey"
             columns: ["sender_id"]
             isOneToOne: false
             referencedRelation: "users"
-            referencedColumns: ["id"]
+            referencedColumns: ["telegram_id"]
           },
         ]
       }
@@ -439,6 +427,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      notification_templates: {
+        Row: {
+          created_at: string | null
+          id: number
+          required_fields: Json | null
+          template_text: string
+          type: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: number
+          required_fields?: Json | null
+          template_text: string
+          type: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: number
+          required_fields?: Json | null
+          template_text?: string
+          type?: string
+        }
+        Relationships: []
       }
       processes: {
         Row: {
@@ -510,15 +522,7 @@ export type Database = {
           updated_at?: string | null
           user_id?: number | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "profiles_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       questions: {
         Row: {
@@ -558,13 +562,6 @@ export type Database = {
           text?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "questions_answered_by_fkey"
-            columns: ["answered_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["telegram_id"]
-          },
           {
             foreignKeyName: "questions_case_id_fkey"
             columns: ["case_id"]
@@ -615,15 +612,7 @@ export type Database = {
           name?: string
           updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "templates_author_id_fkey"
-            columns: ["author_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       user_documents: {
         Row: {
@@ -677,13 +666,6 @@ export type Database = {
             referencedRelation: "documents"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "user_documents_reviewer_id_fkey"
-            columns: ["reviewer_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
         ]
       }
       users: {
@@ -692,7 +674,6 @@ export type Database = {
           created_at: string | null
           email: string | null
           first_name: string | null
-          id: number
           is_active: boolean | null
           last_name: string | null
           password_hash: string | null
@@ -706,7 +687,6 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           first_name?: string | null
-          id?: number
           is_active?: boolean | null
           last_name?: string | null
           password_hash?: string | null
@@ -720,7 +700,6 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           first_name?: string | null
-          id?: number
           is_active?: boolean | null
           last_name?: string | null
           password_hash?: string | null
